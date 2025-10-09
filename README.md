@@ -1,50 +1,52 @@
-# Welcome to your Expo app 👋
+# TrackMyFlight - Mobile Flight Tracking App
 
-This is an [Expo](https://expo.dev) project created with [`create-expo-app`](https://www.npmjs.com/package/create-expo-app).
+A comprehensive React Native flight tracking application built with Expo and TypeScript, featuring real-time flight data from multiple sources.
 
-## Get started
+## Features
 
-1. Install dependencies
+- **Real-time Flight Tracking**: Track flights worldwide with live position updates
+- **Multi-source API Architecture**: Integrates AviationStack, ADSB Exchange, and OpenSky Network
+- **Search Functionality**: Search flights by number, route, or airport
+- **Flight Details**: Comprehensive flight information including aircraft, status, and timing
+- **Responsive Design**: Optimized for mobile devices with React Native
+- **Offline Support**: Caching and error handling for poor connectivity
+- **Dark/Light Theme**: Automatic theme detection
 
-   ```bash
+## Installation
+
+1. Install dependencies:
+   \`\`\`bash
    npm install
-   ```
+   \`\`\`
 
-2. Start the app
+2. Set up environment variables:
+   \`\`\`bash
+   cp .env.example .env
+   # Edit .env with your API keys
+   \`\`\`
 
-   ```bash
-   npx expo start
-   ```
+3. Start the development server:
+   \`\`\`bash
+   npm start
+   \`\`\`
 
-In the output, you'll find options to open the app in a
+## API Configuration
 
-- [development build](https://docs.expo.dev/develop/development-builds/introduction/)
-- [Android emulator](https://docs.expo.dev/workflow/android-studio-emulator/)
-- [iOS simulator](https://docs.expo.dev/workflow/ios-simulator/)
-- [Expo Go](https://expo.dev/go), a limited sandbox for trying out app development with Expo
+### AviationStack API
+- Sign up at [aviationstack.com](https://aviationstack.com/)
+- Get your free API key
+- Add to .env file
 
-You can start developing by editing the files inside the **app** directory. This project uses [file-based routing](https://docs.expo.dev/router/introduction).
+### ADSB Exchange API
+- Register at [adsbexchange.com](https://www.adsbexchange.com/)
+- API key required for enhanced features
+- Add to .env file
 
-## Get a fresh project
+## Available Scripts
+- \`npm start\` - Start Expo development server
+- \`npm run android\` - Run on Android device/emulator
+- \`npm run ios\` - Run on iOS device/simulator
+- \`npm run web\` - Run in web browser
 
-When you're ready, run:
-
-```bash
-npm run reset-project
-```
-
-This command will move the starter code to the **app-example** directory and create a blank **app** directory where you can start developing.
-
-## Learn more
-
-To learn more about developing your project with Expo, look at the following resources:
-
-- [Expo documentation](https://docs.expo.dev/): Learn fundamentals, or go into advanced topics with our [guides](https://docs.expo.dev/guides).
-- [Learn Expo tutorial](https://docs.expo.dev/tutorial/introduction/): Follow a step-by-step tutorial where you'll create a project that runs on Android, iOS, and the web.
-
-## Join the community
-
-Join our community of developers creating universal apps.
-
-- [Expo on GitHub](https://github.com/expo/expo): View our open source platform and contribute.
-- [Discord community](https://chat.expo.dev): Chat with Expo users and ask questions.
+## License
+MIT License

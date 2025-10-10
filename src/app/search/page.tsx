@@ -3,18 +3,105 @@
 import Image from 'next/image'
 import { useRouter } from 'next/navigation'
 import { useState } from 'react'
+// Define Flight interface locally since we're not using shared
+interface FlightPosition {
+  latitude: number
+  longitude: number
+  altitude: number
+  speed: number
+  heading: number
+  timestamp: Date
+}
+
+interface Flight {
+  id: string
+  flightNumber: string
+  callsign?: string
+  airline: {
+    code: string
+    name: string
+  }
+  origin: {
+    code: string
+    name: string
+    city: string
+    country: string
+    latitude: number
+    longitude: number
+    timezone: string
+  }
+  destination: {
+    code: string
+    name: string
+    city: string
+    country: string
+    latitude: number
+    longitude: number
+    timezone: string
+  }
+  aircraft?: {
+    type: string
+    registration: string
+    model: string
+  }
+  status: {
+    scheduled: {
+      departure: Date
+      arrival: Date
+    }
+    estimated?: {
+      departure: Date
+      arrival: Date
+    }
+    status: 'scheduled' | 'departed' | 'arrived' | 'delayed' | 'cancelled' | 'diverted'
+  }
+  currentPosition?: FlightPosition
+  createdAt: Date
+  updatedAt: Date
+}
 
 export default function SearchPage() {
   const [searchQuery, setSearchQuery] = useState('')
   const [searchType, setSearchType] = useState<'flight' | 'route' | 'airport'>('flight')
+  const [searchResults, setSearchResults] = useState<Flight[]>([])
+  const [isSearching, setIsSearching] = useState(false)
+  const [searchError, setSearchError] = useState<string | null>(null)
+  const [hasSearched, setHasSearched] = useState(false)
   const router = useRouter()
 
-  const handleSearch = (e: React.FormEvent) => {
+  const handleSearch = async (e: React.FormEvent) => {
     e.preventDefault()
-    if (searchQuery.trim()) {
-      // For now, just show an alert. In a real app, this would search flights
-      alert(`Searching for ${searchType}: ${searchQuery}`)
+    if (!searchQuery.trim()) return
+
+    setIsSearching(true)
+    setSearchError(null)
+    setHasSearched(true)
+
+    try {
+      const response = await fetch(`/api/flights?search=${encodeURIComponent(searchQuery.trim())}&page=1&pageSize=10`)
+      const result = await response.json()
+      
+      if (response.ok) {
+        setSearchResults(result.flights)
+        
+        if (result.flights.length === 0) {
+          setSearchError(`No flights found for "${searchQuery}"`)
+        }
+      } else {
+        throw new Error(result.error || 'Search failed')
+      }
+    } catch (error) {
+      console.error('Search failed:', error)
+      setSearchError('Search failed. Please try again.')
+      setSearchResults([])
+    } finally {
+      setIsSearching(false)
     }
+  }
+
+  const handleFlightClick = (flight: Flight) => {
+    // Navigate to flight details page
+    router.push(`/flight/${flight.id}`)
   }
 
   const handleBack = () => {
@@ -147,6 +234,85 @@ export default function SearchPage() {
                 </button>
               </form>
 
+              {/* Search Results */}
+              {hasSearched && (
+                <div className="mt-8">
+                  {isSearching ? (
+                    <div className="text-center py-8">
+                      <div className="inline-block animate-spin rounded-full h-8 w-8 border-b-2 border-blue-400"></div>
+                      <p className="text-blue-200 mt-2">Searching flights...</p>
+                    </div>
+                  ) : searchError ? (
+                    <div className="bg-red-500/20 border border-red-500/50 rounded-lg p-4 text-center">
+                      <div className="text-red-300 mb-2">⚠️</div>
+                      <p className="text-white font-medium">{searchError}</p>
+                    </div>
+                  ) : searchResults.length > 0 ? (
+                    <div>
+                      <h3 className="text-lg font-semibold text-white mb-4">
+                        Found {searchResults.length} flight{searchResults.length !== 1 ? 's' : ''}
+                      </h3>
+                      <div className="space-y-3">
+                        {searchResults.map((flight) => (
+                          <div
+                            key={flight.id}
+                            onClick={() => handleFlightClick(flight)}
+                            className="bg-white/10 backdrop-blur-sm rounded-xl p-4 border border-white/20 hover:bg-white/20 transition-all cursor-pointer transform hover:scale-102 hover:shadow-xl"
+                          >
+                            <div className="flex items-center justify-between">
+                              <div className="flex items-center gap-4">
+                                <div className="text-2xl">✈️</div>
+                                <div>
+                                  <div className="font-bold text-white text-lg">
+                                    {flight.flightNumber}
+                                  </div>
+                                  <div className="text-blue-200 text-sm">
+                                    {flight.airline.name}
+                                  </div>
+                                </div>
+                              </div>
+                              <div className="text-right">
+                                <div className="flex items-center gap-2 text-white">
+                                  <div className="text-center">
+                                    <div className="font-medium">{flight.origin.code}</div>
+                                    <div className="text-xs text-blue-200">{flight.origin.city}</div>
+                                  </div>
+                                  <div className="text-blue-400">→</div>
+                                  <div className="text-center">
+                                    <div className="font-medium">{flight.destination.code}</div>
+                                    <div className="text-xs text-blue-200">{flight.destination.city}</div>
+                                  </div>
+                                </div>
+                                <div className="mt-1">
+                                  <span className={`inline-block px-2 py-1 rounded-full text-xs font-medium ${
+                                    flight.status.status === 'departed' ? 'bg-green-500/30 text-green-300' :
+                                    flight.status.status === 'arrived' ? 'bg-blue-500/30 text-blue-300' :
+                                    flight.status.status === 'delayed' ? 'bg-orange-500/30 text-orange-300' :
+                                    flight.status.status === 'cancelled' ? 'bg-red-500/30 text-red-300' :
+                                    'bg-gray-500/30 text-gray-300'
+                                  }`}>
+                                    {flight.status.status.charAt(0).toUpperCase() + flight.status.status.slice(1)}
+                                  </span>
+                                </div>
+                              </div>
+                            </div>
+                            {flight.currentPosition && (
+                              <div className="mt-3 pt-3 border-t border-white/10">
+                                <div className="flex items-center gap-4 text-sm text-blue-200">
+                                  <span>Alt: {Math.round(flight.currentPosition.altitude)}ft</span>
+                                  <span>Speed: {Math.round(flight.currentPosition.speed)}kts</span>
+                                  <span>Heading: {Math.round(flight.currentPosition.heading)}°</span>
+                                </div>
+                              </div>
+                            )}
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  ) : null}
+                </div>
+              )}
+
               {/* Popular Searches */}
               <div className="mt-8">
                 <h3 className="text-lg font-semibold text-white mb-4 flex items-center gap-2">
@@ -157,10 +323,10 @@ export default function SearchPage() {
                   {[
                     { term: 'AA123', desc: 'New York to LA' },
                     { term: 'UA456', desc: 'Chicago to Miami' },
-                    { term: 'DL789', desc: 'Atlanta to Seattle' },
-                    { term: 'JFK-LAX', desc: 'Popular Route' },
+                    { term: 'EZY82EY', desc: 'easyJet Flight' },
+                    { term: 'EZY8456', desc: 'London to Barcelona' },
                     { term: 'LHR-JFK', desc: 'London to NYC' },
-                    { term: 'SFO-BOS', desc: 'San Francisco to Boston' }
+                    { term: 'RYR1234', desc: 'Ryanair Flight' }
                   ].map((item) => (
                     <button
                       key={item.term}

@@ -107,20 +107,28 @@ export default function FlightDetailPage({ params }: { params: { id: string } })
     router.push('/search')
   }
 
-  const formatTime = (date: Date) => {
+  const formatTime = (date: Date | string) => {
+    const dateObj = typeof date === 'string' ? new Date(date) : date
+    if (isNaN(dateObj.getTime())) {
+      return 'N/A'
+    }
     return new Intl.DateTimeFormat('en-US', {
       hour: '2-digit',
       minute: '2-digit',
       hour12: true
-    }).format(date)
+    }).format(dateObj)
   }
 
-  const formatDate = (date: Date) => {
+  const formatDate = (date: Date | string) => {
+    const dateObj = typeof date === 'string' ? new Date(date) : date
+    if (isNaN(dateObj.getTime())) {
+      return 'N/A'
+    }
     return new Intl.DateTimeFormat('en-US', {
       weekday: 'short',
       month: 'short',
       day: 'numeric'
-    }).format(date)
+    }).format(dateObj)
   }
 
   if (loading) {

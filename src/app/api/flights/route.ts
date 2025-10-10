@@ -340,7 +340,7 @@ export async function GET(request: NextRequest) {
       // Create specific mock data for easyJet flights
       mockFlights = [
         {
-          id: `mock_ezy_${queryUpper}`,
+          id: queryUpper,
           flightNumber: queryUpper,
           airline: { code: 'EZY', name: 'easyJet' },
           origin: {

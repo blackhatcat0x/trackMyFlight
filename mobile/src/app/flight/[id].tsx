@@ -1,20 +1,21 @@
+import { FlightTracker } from '@/components/FlightTracker';
 import { getFlightDetails } from '@/services/flightService';
 import { useFlightStore } from '@/store/flightStore';
-import { Flight } from '@/types/flight';
+import { Flight, FlightPosition } from '@/types/flight';
 import { formatAltitude, formatDateTime, formatDuration, formatSpeed } from '@/utils/formatters';
 import { Ionicons } from '@expo/vector-icons';
 import Mapbox from '@rnmapbox/maps';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import React, { useEffect, useState } from 'react';
 import {
-    ActivityIndicator,
-    Alert,
-    ScrollView,
-    Share,
-    StyleSheet,
-    Text,
-    TouchableOpacity,
-    View,
+  ActivityIndicator,
+  Alert,
+  ScrollView,
+  Share,
+  StyleSheet,
+  Text,
+  TouchableOpacity,
+  View
 } from 'react-native';
 
 Mapbox.setAccessToken(process.env.EXPO_PUBLIC_MAPBOX_ACCESS_TOKEN || '');
@@ -159,62 +160,20 @@ export default function FlightDetailScreen() {
       </View>
 
       <ScrollView style={styles.content} showsVerticalScrollIndicator={false}>
-        {/* Map */}
+        {/* Real-time Flight Tracking Map */}
         <View style={styles.mapContainer}>
-          <Mapbox.MapView
-            style={styles.map}
-            styleURL={Mapbox.StyleURL.Light}
-            logoEnabled={false}
-            attributionEnabled={false}
-          >
-            <Mapbox.Camera
-              bounds={{
-                ne: [flight.destination.longitude, flight.destination.latitude],
-                sw: [flight.origin.longitude, flight.origin.latitude],
-                paddingLeft: 20,
-                paddingRight: 20,
-                paddingTop: 20,
-                paddingBottom: 20,
-              }}
-            />
-            
-            {/* Origin marker */}
-            <Mapbox.PointAnnotation
-              id="origin"
-              coordinate={[flight.origin.longitude, flight.origin.latitude]}
-            >
-              <View style={styles.originMarker}>
-                <Text style={styles.markerText}>{flight.origin.code}</Text>
-              </View>
-            </Mapbox.PointAnnotation>
-            
-            {/* Destination marker */}
-            <Mapbox.PointAnnotation
-              id="destination"
-              coordinate={[flight.destination.longitude, flight.destination.latitude]}
-            >
-              <View style={styles.destinationMarker}>
-                <Text style={styles.markerText}>{flight.destination.code}</Text>
-              </View>
-            </Mapbox.PointAnnotation>
-            
-            {/* Current position */}
-            {flight.currentPosition && (
-              <Mapbox.PointAnnotation
-                id="current"
-                coordinate={[
-                  flight.currentPosition.longitude,
-                  flight.currentPosition.latitude
-                ]}
-              >
-                <View style={styles.currentMarker}>
-                  <Ionicons name="airplane" size={20} color="#007AFF" />
-                </View>
-              </Mapbox.PointAnnotation>
-            )}
-            
-            {renderRouteLine()}
-          </Mapbox.MapView>
+          <FlightTracker
+            flight={flight}
+            showRoute={showRoute}
+            onPositionUpdate={(position: FlightPosition) => {
+              // Update flight data with new position
+              setFlight(prev => prev ? {
+                ...prev,
+                currentPosition: position,
+                updatedAt: new Date(),
+              } : null);
+            }}
+          />
           
           <TouchableOpacity
             style={styles.mapToggle}

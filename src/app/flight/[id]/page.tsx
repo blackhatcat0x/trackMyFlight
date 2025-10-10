@@ -1,5 +1,7 @@
 'use client'
 
+import { FlightTracker } from '@/components/FlightTracker'
+import { useRealTimeFlightTracking } from '@/hooks/useRealTimeFlightTracking'
 import Image from 'next/image'
 import { useRouter } from 'next/navigation'
 import { useEffect, useState } from 'react'
@@ -81,6 +83,28 @@ export default function FlightDetailPage({ params }: { params: { id: string } })
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
   const router = useRouter()
+
+  // Real-time flight tracking
+  const {
+    currentPosition,
+    trackingState,
+    isTracking,
+    startTracking,
+    stopTracking,
+    toggleTracking,
+    connectionStatus,
+  } = useRealTimeFlightTracking(flight, {
+    autoStart: true,
+    onPositionChange: (position) => {
+      if (flight) {
+        setFlight(prev => prev ? {
+          ...prev,
+          currentPosition: position,
+          updatedAt: new Date(),
+        } : null)
+      }
+    },
+  })
 
   useEffect(() => {
     const fetchFlightDetails = async () => {
@@ -304,6 +328,61 @@ export default function FlightDetailPage({ params }: { params: { id: string } })
               </div>
             )}
           </div>
+
+          {/* Real-time Flight Tracking Map */}
+          {flight.currentPosition && (
+            <div className="bg-white/10 backdrop-blur-md rounded-2xl shadow-2xl p-6 border border-white/20 mb-6">
+              <div className="flex items-center justify-between mb-4">
+                <h3 className="text-xl font-bold text-white">Live Flight Tracking</h3>
+                <div className="flex items-center gap-2">
+                  <div className={`w-2 h-2 rounded-full ${
+                    connectionStatus === 'connected' ? 'bg-green-400 animate-pulse' :
+                    connectionStatus === 'connecting' ? 'bg-yellow-400 animate-pulse' :
+                    'bg-red-400'
+                  }`}></div>
+                  <span className="text-xs text-blue-200 capitalize">{connectionStatus}</span>
+                </div>
+              </div>
+              
+              {/* Map container */}
+              <div className="relative h-96 rounded-lg overflow-hidden mb-4">
+                <FlightTracker
+                  flight={flight}
+                  showRoute={true}
+                  onPositionUpdate={(position: FlightPosition) => {
+                    setFlight(prev => prev ? {
+                      ...prev,
+                      currentPosition: position,
+                      updatedAt: new Date(),
+                    } : null)
+                  }}
+                  className="w-full h-full"
+                />
+              </div>
+
+              {/* Tracking controls */}
+              <div className="flex items-center justify-between">
+                <div className="text-sm text-blue-200">
+                  {isTracking ? 'Live tracking active' : 'Tracking paused'}
+                  {trackingState.lastUpdate && (
+                    <span className="ml-2">
+                      • Updated {formatTime(trackingState.lastUpdate)}
+                    </span>
+                  )}
+                </div>
+                <button
+                  onClick={toggleTracking}
+                  className={`px-4 py-2 rounded-lg text-sm font-medium transition-all ${
+                    isTracking
+                      ? 'bg-red-500/20 text-red-300 hover:bg-red-500/30 border border-red-500/30'
+                      : 'bg-green-500/20 text-green-300 hover:bg-green-500/30 border border-green-500/30'
+                  }`}
+                >
+                  {isTracking ? 'Pause Tracking' : 'Resume Tracking'}
+                </button>
+              </div>
+            </div>
+          )}
 
           {/* Aircraft Info */}
           {flight.aircraft && (

@@ -1,420 +1,631 @@
-import axios from 'axios'
+import axios, { AxiosInstance } from 'axios'
 import { NextRequest, NextResponse } from 'next/server'
 
-// Flight API sources
-const FLIGHT_API_SOURCES = [
-  {
-    name: 'ADSBExchange',
-    baseUrl: 'https://api.adsbexchange.com/api/aircraft',
-    priority: 1,
-    timeout: 15000,
-    headers: { 'User-Agent': 'TrackMyFlight-App/1.0' },
-  },
-  {
-    name: 'AirplanesLive',
-    baseUrl: 'https://api.airplanes.live/v2',
-    priority: 2,
-    timeout: 15000,
-    headers: {},
+/**
+ * Flight search + live-position enrichment route
+ * - Resolves flight by number via Aviationstack (status/schedule)
+ * - Enriches with a free live position via Airplanes.live (callsign endpoint)
+ * - Handles easyJet robustly (IATA U2 <-> ICAO EZY) and other common patterns
+ * - Supports route search (LHR-BCN) and airport search (LHR)
+ *
+ * Env vars (optional but recommended):
+ *   NEXT_PUBLIC_AVIATIONSTACK_API_KEY=xxxxxxxxxxxxxxxxxxxxxxxx
+ */
+
+// ----------------------------
+// Helpers
+// ----------------------------
+
+function parseFlightCode(q: string) {
+  // Capture airline prefix (2-3 letters), number, optional 1-2 trailing letters
+  const m = q.match(/^([A-Z]{2,3})(\d+)([A-Z]{0,2})$/)
+  if (!m) return null
+  return { prefix: m[1], number: m[2], suffix: m[3] || '' }
+}
+
+function parseRoute(q: string): { dep: string; arr: string } | null {
+  const m = q.match(/^([A-Z]{3})-([A-Z]{3})$/)
+  if (!m) return null
+  return { dep: m[1], arr: m[2] }
+}
+
+function iataFromIcaoPrefix(icao: string): string | undefined {
+  // reverse lookup in AIRLINE_IATA_TO_ICAO
+  const entry = Object.entries(AIRLINE_IATA_TO_ICAO).find(([, v]) => v === icao)
+  return entry?.[0]
+}
+
+function buildVariants(q: string): string[] {
+  // Return a list of plausible flight identifiers we can try to match/enrich
+  const out = new Set<string>([q])
+  const parsed = parseFlightCode(q)
+  if (parsed) {
+    const { prefix, number, suffix } = parsed
+    // If EZY -> add U2 variants (drop suffix for schedule matching)
+    if (prefix.length === 3) {
+      out.add(`${prefix}${number}`) // numeric only
+      const iata = iataFromIcaoPrefix(prefix)
+      if (iata) {
+        out.add(`${iata}${number}`)
+        if (suffix) out.add(`${iata}${number}${suffix}`)
+      }
+    }
+    // If IATA (2 letters) -> add ICAO variants
+    if (prefix.length === 2) {
+      const icao = AIRLINE_IATA_TO_ICAO[prefix]
+      if (icao) {
+        out.add(`${icao}${number}`)
+        if (suffix) out.add(`${icao}${number}${suffix}`)
+      }
+      out.add(`${prefix}${number}`) // numeric only too
+    }
+    // Also include version without suffix if present
+    if (suffix) {
+      out.add(`${prefix}${number}`)
+    }
   }
-]
+  return Array.from(out)
+}
 
-const AVIATIONSTACK_API_BASE = 'http://api.aviationstack.com/v1'
+function matchesAnyCandidate(code: string | undefined, candidates: string[]): boolean {
+  if (!code) return false
+  const norm = code.replace(/\s+/g, '').toUpperCase()
+  return candidates.some(c => c === norm)
+}
 
-// Create axios instances
-const aviationStackApi = axios.create({
-  baseURL: AVIATIONSTACK_API_BASE,
-  timeout: 10000,
+
+const AIRLINE_IATA_TO_ICAO: Record<string, string> = {
+  // Expand as needed
+  U2: 'EZY',   // easyJet
+  BA: 'BAW',   // British Airways (callsign often BAW + number)
+  FR: 'RYR',   // Ryanair
+  EZ: 'EZS',   // easyJet Switzerland (IATA EZ -> ICAO EZS)
+}
+
+function normalizeQuery(raw?: string): string {
+  return (raw || '').toUpperCase().replace(/\s+/g, '')
+}
+
+function splitAirlineAndNumber(q: string): { airline?: string; number?: string } {
+  const m = q.match(/^([A-Z]{2,3})(\d+[A-Z]?)$/)
+  if (m) return { airline: m[1], number: m[2] }
+  return { airline: undefined, number: undefined }
+}
+
+function iataToIcaoAirline(iata?: string): string | undefined {
+  if (!iata) return undefined
+  return AIRLINE_IATA_TO_ICAO[iata] // may be undefined if not mapped
+}
+
+function makeAirplanesLiveCallsign(q: string): string | undefined {
+  // If query already looks like ICAO callsign (3 letters + number), use it
+  if (/^[A-Z]{3}\d+[A-Z]?$/.test(q)) return q
+  // If it's IATA + number, convert IATA -> ICAO using small map above
+  const { airline, number } = splitAirlineAndNumber(q)
+  if (airline && number) {
+    const icao = iataToIcaoAirline(airline) || (airline.length === 3 ? airline : undefined)
+    if (icao) return `${icao}${number}`
+  }
+  return undefined
+}
+
+// ----------------------------
+// Axios clients
+// ----------------------------
+
+const aviationStackApi: AxiosInstance = axios.create({
+  baseURL: 'https://api.aviationstack.com/v1',
+  timeout: 15000,
 })
 
-/**
- * Try all flight API sources until one works
- */
-const tryFlightApiSources = async (endpoint: string, params?: any): Promise<any> => {
-  for (const source of FLIGHT_API_SOURCES) {
-    try {
-      console.log(`Trying ${source.name} for ${endpoint}...`)
-      
-      let url = `${source.baseUrl}${endpoint}`
-      
-      // Handle different API formats
-      if (source.name === 'AirplanesLive' && params?.lat && params?.lon) {
-        // Airplanes.live uses different URL format
-        const radius = params?.dist || 50
-        url = `${source.baseUrl}/point/${params.lat}/${params.lon}/${radius}`
-        delete params.lat
-        delete params.lon
-        delete params.dist
+const airplanesLiveApi: AxiosInstance = axios.create({
+  baseURL: 'https://api.airplanes.live/v2',
+  timeout: 12000,
+  headers: { 'User-Agent': 'TrackMyFlight-App/1.0' },
+})
+
+// ----------------------------
+// Aviationstack search
+// ----------------------------
+
+type AviationFlight = {
+  flight_date?: string
+  flight_status?: string
+  departure?: any
+  arrival?: any
+  airline?: { name?: string; iata?: string; icao?: string }
+  flight?: { number?: string; iata?: string; icao?: string }
+  aircraft?: { registration?: string; iata?: string; icao?: string; icao24?: string }
+}
+
+function buildAviationParams(
+  queryRaw: string,
+  searchType: 'flight' | 'route' | 'airport',
+  airlineHint?: string,
+  date?: string
+) {
+  const q = normalizeQuery(queryRaw)
+
+  // Base params
+  const params: Record<string, string | number> = {
+    access_key: process.env.NEXT_PUBLIC_AVIATIONSTACK_API_KEY as string,
+    limit: 10,
+    offset: 0,
+  }
+
+  // IMPORTANT: Date filtering requires PAID plan (Basic or higher)
+  // For FREE plan, only real-time/active flights are available
+  const allowDateFilter = process.env.AVIATIONSTACK_ALLOW_DATE_FILTER === 'true'
+
+  if (searchType === 'route') {
+    // Route search: LHR-BCN
+    const route = parseRoute(q)
+    if (route) {
+      params['dep_iata'] = route.dep
+      params['arr_iata'] = route.arr
+      // Only add date if explicitly allowed (paid plan)
+      if (allowDateFilter && date && /^\d{4}-\d{2}-\d{2}$/.test(date)) {
+        params['flight_date'] = date
       }
-      
-      const response = await axios.get(url, {
-        timeout: source.timeout,
-        headers: source.headers,
-        params: source.name === 'ADSBExchange' ? params : undefined,
-      })
-      
-      console.log(`✅ ${source.name} successful`)
-      return transformApiResponse(source.name, response.data)
-      
-    } catch (error) {
-      console.warn(`❌ ${source.name} failed:`, error instanceof Error ? error.message : 'Unknown error')
-      continue
+    }
+    return params
+  }
+
+  if (searchType === 'airport') {
+    // Airport search: list departures from this airport
+    params['dep_iata'] = q
+    // Only add date if explicitly allowed (paid plan)
+    if (allowDateFilter && date && /^\d{4}-\d{2}-\d{2}$/.test(date)) {
+      params['flight_date'] = date
+    }
+    return params
+  }
+
+  // Flight number search (original logic)
+  // Detect by pattern
+  if (/^[A-Z]{3}\d+[A-Z]{0,2}$/.test(q)) {
+    // ICAO flight id (e.g., EZY1234 or EZY18YX)
+    const parsed = parseFlightCode(q);
+    if (parsed && parsed.suffix) {
+      // Remove suffix letters for API query (EZY18YX -> EZY18)
+      params['flight_icao'] = `${parsed.prefix}${parsed.number}`
+    } else {
+      params['flight_icao'] = q
+    }
+  } else if (/^[A-Z]{2}\d+[A-Z]{0,2}$/.test(q)) {
+    // IATA flight id (e.g., U21234)
+    const parsed2 = parseFlightCode(q);
+    if (parsed2 && parsed2.suffix) {
+      // Remove suffix letters for API query
+      params['flight_iata'] = `${parsed2.prefix}${parsed2.number}`
+    } else {
+      params['flight_iata'] = q
+    }
+  } else if (/^\d{2,4}[A-Z]?$/.test(q)) {
+    // Bare number; use airline hint if provided
+    params['flight_number'] = q
+    const hint = normalizeQuery(airlineHint || '')
+    if (hint) {
+      if (/^[A-Z]{3}$/.test(hint)) params['airline_icao'] = hint
+      if (/^[A-Z]{2}$/.test(hint)) params['airline_iata'] = hint
+    }
+  } else {
+    // As a last resort, if user typed an airline code as prefix, add airline filter
+    const { airline } = splitAirlineAndNumber(q)
+    if (airline) {
+      if (airline.length === 3) params['airline_icao'] = airline
+      if (airline.length === 2) params['airline_iata'] = airline
     }
   }
-  
-  throw new Error('All flight API sources failed')
-}
 
-/**
- * Transform different API responses to consistent format
- */
-const transformApiResponse = (sourceName: string, data: any): any => {
-  if (sourceName === 'AirplanesLive') {
-    // Airplanes.live format: { ac: [...] } similar to ADSBExchange
-    return {
-      ac: data.ac || data.aircraft || []
-    }
+  // easyJet robustness: if query begins U2 -> also set airline_iata=U2
+  if (q.startsWith('U2')) params['airline_iata'] = 'U2'
+  // If begins EZY -> airline_icao=EZY
+  if (q.startsWith('EZY')) params['airline_icao'] = 'EZY'
+
+  // Optional date filter (YYYY-MM-DD) for schedule matching
+  // ONLY ADD IF PAID PLAN - Free plan does NOT support date filtering
+  if (allowDateFilter && date && /^\d{4}-\d{2}-\d{2}$/.test(date)) {
+    (params as any)['flight_date'] = date
   }
   
-  // ADSBExchange format is already what we expect
-  return data
+  return params
 }
 
-/**
- * Transform flight data from any source
- */
-const transformFlightData = (apiData: any, searchLat?: number, searchLon?: number): any => {
+function mapStatus(apiStatus?: string): string {
+  if (!apiStatus) return 'scheduled'
+  const statusMap: Record<string, string> = {
+    scheduled: 'scheduled',
+    active: 'departed',
+    departed: 'departed',
+    'en-route': 'departed',
+    landed: 'arrived',
+    arrived: 'arrived',
+    delayed: 'delayed',
+    cancelled: 'cancelled',
+    diverted: 'diverted',
+  }
+  return statusMap[apiStatus.toLowerCase()] || 'scheduled'
+}
+
+// ----------------------------
+// Airplanes.live enrichment
+// ----------------------------
+
+type LiveAircraft = {
+  hex?: string
+  flight?: string
+  lat?: number
+  lon?: number
+  alt_baro?: number | null
+  alt_geom?: number | null
+  gs?: number | null
+  track?: number | null
+  seen?: number | null
+  seen_pos?: number | null
+  rssi?: number | null
+}
+
+async function fetchLiveByCallsign(callsign: string): Promise<LiveAircraft | null> {
   try {
-    const flightNumber = apiData.flight ? apiData.flight.trim() : 'UNKNOWN'
-    const id = `${apiData.hex || 'unknown'}_${flightNumber}`
-    const airlineCode = flightNumber.length >= 2 ? flightNumber.substring(0, 2) : 'UNKNOWN'
-    
-    return {
-      id,
-      flightNumber,
-      callsign: flightNumber,
-      airline: {
-        code: airlineCode,
-        name: getAirlineName(airlineCode),
-      },
-      origin: {
-        code: 'UNKNOWN',
-        name: 'Unknown',
-        city: 'Unknown',
-        country: 'Unknown',
-        latitude: 0,
-        longitude: 0,
-        timezone: 'UTC',
-      },
-      destination: {
-        code: 'UNKNOWN',
-        name: 'Unknown',
-        city: 'Unknown',
-        country: 'Unknown',
-        latitude: 0,
-        longitude: 0,
-        timezone: 'UTC',
-      },
-      aircraft: {
-        type: getAircraftType(apiData.type),
-        registration: apiData.r || apiData.registration || 'UNKNOWN',
-        model: getAircraftModel(apiData.type),
-      },
-      status: {
-        scheduled: {
-          departure: new Date(),
-          arrival: new Date(Date.now() + 3600000),
-        },
-        status: getFlightStatus(apiData.alt_baro, apiData.gs),
-      },
-      currentPosition: apiData.lat && apiData.lon ? {
-        latitude: apiData.lat,
-        longitude: apiData.lon,
-        altitude: apiData.alt_baro || apiData.alt_geom || 0,
-        speed: apiData.gs || 0,
-        heading: apiData.track || 0,
-        timestamp: new Date(),
-      } : undefined,
-      createdAt: new Date(),
-      updatedAt: new Date(),
-    }
-  } catch (error) {
-    console.error('Error transforming flight data:', error)
+    const { data } = await airplanesLiveApi.get(`/callsign/${encodeURIComponent(callsign)}`)
+    const ac = Array.isArray(data?.ac) ? data.ac : []
+    if (!ac.length) return null
+    // Prefer aircraft with a current position (lat/lon present)
+    const withPos = ac.filter((a: any) => typeof a.lat === 'number' && typeof a.lon === 'number')
+    const best = (withPos[0] || ac[0]) as LiveAircraft
+    return best || null
+  } catch (_err) {
     return null
   }
 }
 
-// Helper functions
-const getAirlineName = (code: string): string => {
-  const airlines: Record<string, string> = {
-    'AA': 'American Airlines', 'UA': 'United Airlines', 'DL': 'Delta Air Lines',
-    'SW': 'Southwest Airlines', 'BA': 'British Airways', 'LH': 'Lufthansa',
-    'AF': 'Air France', 'EK': 'Emirates', 'QR': 'Qatar Airways',
-    'SQ': 'Singapore Airlines', 'JL': 'Japan Airlines', 'QF': 'Qantas',
-    'AC': 'Air Canada', 'WS': 'WestJet', 'B6': 'JetBlue',
-    'NK': 'Spirit Airlines', 'F9': 'Frontier Airlines', 'EZY': 'easyJet',
-    'RYR': 'Ryanair', 'WZZ': 'Wizz Air', 'FR': 'Ryanair', 'U2': 'easyJet',
-  }
-  return airlines[code] || 'Unknown Airline'
+// ----------------------------
+// ADS-B Exchange enrichment
+// ----------------------------
+
+type AdsbxAircraft = {
+  hex?: string
+  flight?: string
+  lat?: number
+  lon?: number
+  alt_baro?: number | null
+  alt_geom?: number | null
+  gs?: number | null
+  track?: number | null
+  seen?: number | null
+  seen_pos?: number | null
 }
 
-const getAircraftType = (type: string): string => {
-  if (!type) return 'UNKNOWN'
-  const aircraftTypes: Record<string, string> = {
-    'L2J': 'Jet', 'L1P': 'Piston', 'L2T': 'Turboprop', 'L4J': 'Jet',
-    'H2T': 'Helicopter', 'H1P': 'Helicopter', 'H2J': 'Helicopter',
-  }
-  return aircraftTypes[type] || type
-}
+const ADSBEX_PROVIDER = (process.env.ADSBEX_PROVIDER || 'rapidapi').toLowerCase()
+const ADSBEX_ENTERPRISE_BASE = process.env.ADSBEX_ENTERPRISE_BASE || 'https://api.adsbexchange.com/v2'
+const ADSBEX_ENTERPRISE_KEY = process.env.ADSBEX_ENTERPRISE_KEY || ''
+const ADSBEX_RAPIDAPI_KEY = process.env.ADSBEX_RAPIDAPI_KEY || ''
 
-const getAircraftModel = (type: string): string => {
-  if (!type) return 'Unknown'
-  const models: Record<string, string> = {
-    'L2J': 'Commercial Jet', 'L1P': 'Piston Aircraft', 'L2T': 'Turboprop Aircraft',
-    'L4J': 'Large Jet', 'H2T': 'Turbine Helicopter', 'H1P': 'Piston Helicopter',
-    'H2J': 'Jet Helicopter',
-  }
-  return models[type] || 'Unknown Aircraft'
-}
-
-const getFlightStatus = (altitude?: number, speed?: number): string => {
-  if (!altitude || altitude < 100) return 'scheduled'
-  if (altitude > 5000 && (speed || 0) > 100) return 'departed'
-  if (altitude < 5000 && (speed || 0) > 50) return 'arrived'
-  return 'scheduled'
-}
-
-export async function GET(request: NextRequest) {
+async function fetchLiveByCallsignAdsbx(callsign: string): Promise<AdsbxAircraft | null> {
   try {
-    const { searchParams } = new URL(request.url)
-    const query = searchParams.get('search')
-    const page = parseInt(searchParams.get('page') || '1')
-    const pageSize = parseInt(searchParams.get('pageSize') || '20')
-
-    if (!query) {
-      return NextResponse.json({ error: 'Search query is required' }, { status: 400 })
-    }
-
-    console.log(`Searching flights for query: ${query}`)
-
-    // Try AviationStack first for scheduled flights
-    try {
-      console.log(`Trying AviationStack with query: ${query}`)
-      const aviationResponse = await aviationStackApi.get('/flights', {
-        params: {
-          access_key: process.env.NEXT_PUBLIC_AVIATIONSTACK_API_KEY,
-          search: query,
-          limit: pageSize,
-          offset: (page - 1) * pageSize,
+    if (ADSBEX_PROVIDER === 'enterprise' && ADSBEX_ENTERPRISE_KEY) {
+      // Enterprise: documented v2 usually uses path /callsign/{cs} with header 'api-auth'
+      const url = `${ADSBEX_ENTERPRISE_BASE.replace(/\/+$/,'')}/callsign/${encodeURIComponent(callsign)}`
+      const { data } = await axios.get(url, { headers: { 'api-auth': ADSBEX_ENTERPRISE_KEY }, timeout: 12000 })
+      const ac = Array.isArray(data?.ac) ? data.ac : []
+      if (!ac.length) return null
+      const withPos = ac.filter((a: any) => typeof a.lat === 'number' && typeof a.lon === 'number')
+      return (withPos[0] || ac[0]) as AdsbxAircraft
+    } else if (ADSBEX_RAPIDAPI_KEY) {
+      // RapidAPI "Lite"
+      const url = `https://adsbexchange-com1.p.rapidapi.com/v2/callsign/${encodeURIComponent(callsign)}`
+      const { data } = await axios.get(url, {
+        headers: {
+          'X-RapidAPI-Key': ADSBEX_RAPIDAPI_KEY,
+          'X-RapidAPI-Host': 'adsbexchange-com1.p.rapidapi.com',
         },
+        timeout: 12000,
+      })
+      const ac = Array.isArray(data?.ac) ? data.ac : []
+      if (!ac.length) return null
+      const withPos = ac.filter((a: any) => typeof a.lat === 'number' && typeof a.lon === 'number')
+      return (withPos[0] || ac[0]) as AdsbxAircraft
+    }
+    return null
+  } catch (_e) {
+    return null
+  }
+}
+
+// ----------------------------
+// OpenSky Network enrichment
+// ----------------------------
+
+type OpenSkyStates = {
+  time: number
+  states: any[] | null
+}
+
+const OPEN_SKY_BASE = (process.env.OPENSkY_BASE || 'https://opensky-network.org').replace(/\/+$/,'')
+
+async function fetchLiveByCallsignOpenSky(callsign: string): Promise<LiveAircraft | null> {
+  try {
+    // OpenSky allows a callsign filter; unauthenticated is rate-limited
+    const url = `${OPEN_SKY_BASE}/api/states/all?callsign=${encodeURIComponent(callsign)}`
+    const { data } = await axios.get<OpenSkyStates>(url, { timeout: 12000 })
+    const states = Array.isArray((data as any)?.states) ? (data as any).states : []
+    if (!states.length) return null
+    // Pick the first state with a position
+    const withPos = states.filter((s: any[]) => typeof s[6] === 'number' && typeof s[5] === 'number')
+    const s = (withPos[0] || states[0]) as any[]
+    const rec: LiveAircraft = {
+      hex: s[0] || undefined,
+      flight: (s[1] || '').toString().trim() || callsign,
+      lat: typeof s[6] === 'number' ? s[6] : undefined,
+      lon: typeof s[5] === 'number' ? s[5] : undefined,
+      alt_baro: typeof s[7] === 'number' ? s[7] : null,
+      alt_geom: typeof s[13] === 'number' ? s[13] : null,
+      gs: typeof s[9] === 'number' ? (s[9] * 1.94384) : null, // m/s -> knots
+      track: typeof s[10] === 'number' ? s[10] : null,
+      seen: typeof s[4] === 'number' ? (Date.now()/1000 - s[4]) : null,
+      seen_pos: typeof s[3] === 'number' ? (Date.now()/1000 - s[3]) : null,
+      rssi: null,
+    }
+    return rec
+  } catch (_e) {
+    return null
+  }
+}
+
+// ----------------------------
+// Fallback live fetch (Airplanes.live -> ADS-B Exchange -> OpenSky)
+// ----------------------------
+
+async function fetchLiveAny(callsign: string): Promise<LiveAircraft | null> {
+  // 1) Airplanes.live
+  const a = await fetchLiveByCallsign(callsign)
+  if (a) return { ...a, source: 'airplanes.live' } as any
+  // 2) ADS-B Exchange (if configured)
+  const b = await fetchLiveByCallsignAdsbx(callsign)
+  if (b) return { ...b, source: 'adsbx' } as any
+  // 3) OpenSky
+  const c = await fetchLiveByCallsignOpenSky(callsign)
+  if (c) return { ...c, source: 'opensky' } as any
+  return null
+}
+
+// ----------------------------
+// Handler
+// ----------------------------
+
+export async function GET(req: NextRequest) {
+  const { searchParams } = new URL(req.url)
+  const query = searchParams.get('query') || searchParams.get('q') || ''
+  const searchType = (searchParams.get('type') || 'flight') as 'flight' | 'route' | 'airport'
+  const airlineHint = searchParams.get('airline') || ''
+  const dateParam = (searchParams.get('date') || '').trim()
+  const debugFlag = searchParams.get('debug') === '1' || process.env.DEBUG_FLIGHTS === '1'
+
+  if (!query.trim()) {
+    return NextResponse.json({ error: 'Missing ?query=' }, { status: 400 })
+  }
+
+  const qNorm = normalizeQuery(query)
+
+  // If no Aviationstack key, short-circuit to live-only enrichment using callsign
+  const noAviationKey = !process.env.NEXT_PUBLIC_AVIATIONSTACK_API_KEY
+  if (noAviationKey) {
+    const csCandidates = buildVariants(qNorm)
+    const cs = csCandidates[0]
+    if (!cs) {
+      return NextResponse.json({ flights: [], note: 'Provide an Aviationstack key for schedule/status resolution.' })
+    }
+    const live = await fetchLiveAny(cs)
+    return NextResponse.json({
+      debug: debugFlag ? { qNorm, liveOnly: true } : undefined,
+      flights: [{
+        id: `live_only_${cs}`,
+        flightNumber: qNorm,
+        airline: inferAirlineFromPrefix(qNorm),
+        status: 'unknown',
+        live: live ? normalizeLive(live) : null,
+      }],
+      note: 'Live position via Airplanes.live (no schedule/status because no Aviationstack key provided).'
+    })
+  }
+
+  try {
+    // IMPORTANT: Don't pass date to buildAviationParams unless explicitly allowed
+    // Free plan does NOT support date filtering
+    const allowDateFilter = process.env.AVIATIONSTACK_ALLOW_DATE_FILTER === 'true'
+    const dateToUse = allowDateFilter ? dateParam : undefined
+    
+    const params = buildAviationParams(qNorm, searchType, airlineHint || undefined, dateToUse)
+    const { data } = await aviationStackApi.get('/flights', { params })
+
+    const flights: AviationFlight[] = Array.isArray(data?.data) ? data.data : []
+
+    // Build candidate identifiers from user query to improve precision (handles suffix letters)
+    const candidates = buildVariants(qNorm)
+
+    const debugInfo: any = debugFlag ? { qNorm, searchType, candidates, params } : undefined
+
+    // For flight search, filter results to those matching any candidate by IATA/ICAO/number+airline where possible
+    let results = flights
+    
+    if (searchType === 'flight') {
+      const filtered = flights.filter((f) => {
+        const fiata = (f.flight?.iata || '').toUpperCase().replace(/\s+/g, '')
+        const ficao = (f.flight?.icao || '').toUpperCase().replace(/\s+/g, '')
+        const airlineIata = (f.airline?.iata || '').toUpperCase()
+        const airlineIcao = (f.airline?.icao || '').toUpperCase()
+        const number = (f.flight?.number || '').toUpperCase()
+        const comboIata = airlineIata && number ? `${airlineIata}${number}` : ''
+        const comboIcao = airlineIcao && number ? `${airlineIcao}${number}` : ''
+        return matchesAnyCandidate(fiata, candidates) || matchesAnyCandidate(ficao, candidates) || matchesAnyCandidate(comboIata, candidates) || matchesAnyCandidate(comboIcao, candidates)
       })
 
-      if (aviationResponse.data && aviationResponse.data.data) {
-        const scheduledFlights = aviationResponse.data.data
-        
-        // First, try to find exact matches
-        const exactMatches = scheduledFlights.filter((flightData: any) => {
-          const flightIATA = flightData.flight?.iata?.toUpperCase()
-          const flightICAO = flightData.flight?.icao?.toUpperCase()
-          const flightNumber = flightData.flight?.number?.toUpperCase()
-          const queryUpper = query.toUpperCase()
-          
-          console.log(`Checking flight: IATA=${flightIATA}, ICAO=${flightICAO}, Number=${flightNumber} against query=${queryUpper}`)
-          
-          return flightIATA === queryUpper || flightICAO === queryUpper || flightNumber === queryUpper
-        })
-        
-        console.log(`Found ${exactMatches.length} exact matches out of ${scheduledFlights.length} total flights`)
-        
-        // If we found exact matches, use only those
-        const flightsToUse = exactMatches.length > 0 ? exactMatches : scheduledFlights
-        
-        const transformedFlights = flightsToUse.map((flightData: any) => ({
-          id: flightData.flight?.iata || flightData.flight?.icao || `flight_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`,
-          flightNumber: flightData.flight?.iata || flightData.flight?.number || 'UNKNOWN',
-          callsign: flightData.flight?.callsign,
-          airline: {
-            code: flightData.airline?.iata || flightData.airline?.icao || 'UNKNOWN',
-            name: flightData.airline?.name || 'Unknown Airline',
-          },
-          origin: {
-            code: flightData.departure?.iata || flightData.departure?.icao || 'UNKNOWN',
-            name: flightData.departure?.airport || 'Unknown Airport',
-            city: flightData.departure?.city || 'Unknown',
-            country: flightData.departure?.country || 'Unknown',
-            latitude: parseFloat(flightData.departure?.latitude) || 0,
-            longitude: parseFloat(flightData.departure?.longitude) || 0,
-            timezone: flightData.departure?.timezone || 'UTC',
-          },
-          destination: {
-            code: flightData.arrival?.iata || flightData.arrival?.icao || 'UNKNOWN',
-            name: flightData.arrival?.airport || 'Unknown Airport',
-            city: flightData.arrival?.city || 'Unknown',
-            country: flightData.arrival?.country || 'Unknown',
-            latitude: parseFloat(flightData.arrival?.latitude) || 0,
-            longitude: parseFloat(flightData.arrival?.longitude) || 0,
-            timezone: flightData.arrival?.timezone || 'UTC',
-          },
-          aircraft: flightData.aircraft ? {
-            type: flightData.aircraft.iata || flightData.aircraft.icao || 'UNKNOWN',
-            registration: flightData.aircraft.registration || 'UNKNOWN',
-            model: flightData.aircraft.model || 'Unknown',
-          } : undefined,
-          status: {
-            scheduled: {
-              departure: new Date(flightData.departure?.scheduled || Date.now()),
-              arrival: new Date(flightData.arrival?.scheduled || Date.now() + 3600000),
-            },
-            estimated: flightData.departure?.estimated ? {
-              departure: new Date(flightData.departure.estimated),
-              arrival: new Date(flightData.arrival?.estimated),
-            } : undefined,
-            status: mapFlightStatus(flightData.flight_status || 'scheduled'),
-          },
-          currentPosition: undefined,
-          createdAt: new Date(),
-          updatedAt: new Date(),
-        }))
+      results = filtered.length ? filtered : flights
 
-        // Only return results if we found the exact flight
-        if (exactMatches.length > 0) {
-          return NextResponse.json({
-            flights: transformedFlights,
-            total: exactMatches.length,
-            page,
-            pageSize,
-          })
+      if (!results.length) {
+        const altParams = { ...params }
+        if (qNorm.startsWith('EZY') && !altParams['flight_iata']) {
+          delete altParams['flight_icao']
+          altParams['flight_iata'] = qNorm.replace(/^EZY/, 'U2')
+          altParams['airline_iata'] = 'U2'
+          const alt = await aviationStackApi.get('/flights', { params: altParams })
+          results = Array.isArray(alt.data?.data) ? alt.data.data : []
+        } else if (qNorm.startsWith('U2') && !altParams['flight_icao']) {
+          delete altParams['flight_iata']
+          altParams['flight_icao'] = qNorm.replace(/^U2/, 'EZY')
+          altParams['airline_icao'] = 'EZY'
+          const alt = await aviationStackApi.get('/flights', { params: altParams })
+          results = Array.isArray(alt.data?.data) ? alt.data.data : []
         }
-        
-        console.log('No exact matches found in AviationStack, trying next method...')
       }
-    } catch (aviationError) {
-      console.warn('AviationStack failed:', aviationError)
     }
 
-    // Fallback to real-time search
-    try {
-      const response = await tryFlightApiSources('/json')
+    if (!results.length) {
+      // Return a helpful empty response instead of generic 200 []
+      const typeLabel = searchType === 'route' ? 'route' : searchType === 'airport' ? 'airport' : 'flight'
+      return NextResponse.json({
+        flights: [],
+        note: `No ${typeLabel}s found for "${query}"${dateParam ? ` on ${dateParam}` : ''}. Check ${searchType} code, date, or try later.`,
+        debug: debugFlag ? debugInfo : undefined
+      })
+    }
+
+    // Limit to 10 and map + enrich with live
+    const enriched = await Promise.all(results.slice(0, 10).map(async (f) => {
+      const flightIcao = f.flight?.icao?.toUpperCase()
+      const flightIata = f.flight?.iata?.toUpperCase()
+      const csVariants = buildVariants((flightIcao || flightIata || qNorm))
+      let live: any = null
       
-      if (response && response.ac) {
-        const queryUpper = query.toUpperCase()
-        const aircraft = response.ac
-        
-        // First, try to find exact matches
-        const exactMatches = aircraft.filter((ac: any) => {
-          const flight = ac.flight?.toUpperCase()
-          console.log(`Checking realtime flight: ${flight} against query=${queryUpper}`)
-          return flight === queryUpper
-        })
-        
-        console.log(`Found ${exactMatches.length} exact matches in realtime data`)
-        
-        // Only return results if we found exact matches
-        if (exactMatches.length > 0) {
-          const flights = exactMatches
-            .slice((page - 1) * pageSize, page * pageSize)
-            .map((ac: any) => transformFlightData(ac))
-            .filter((flight: any) => flight !== null)
-          
-          return NextResponse.json({
-            flights,
-            total: exactMatches.length,
-            page,
-            pageSize,
-          })
+      // Only enrich with live data for flight searches
+      if (searchType === 'flight') {
+        for (const cs of csVariants) { 
+          live = await fetchLiveAny(cs); 
+          if (live) break; 
         }
-        
-        console.log('No exact matches found in realtime data, trying mock data...')
       }
-    } catch (realtimeError) {
-      console.warn('Real-time search failed:', realtimeError)
-    }
 
-    // Return mock data if all APIs fail
-    const queryUpper = query.toUpperCase()
-    const isEZYFlight = queryUpper.startsWith('EZY')
+      return {
+        id: `${(f.flight?.iata || f.flight?.icao || f.flight?.number || 'unknown')}_${f.flight_date || ''}`,
+        flightNumber: f.flight?.iata || f.flight?.icao || (f.airline?.iata || f.airline?.icao ? `${f.airline?.iata || f.airline?.icao}${f.flight?.number || ''}` : f.flight?.number),
+        airline: {
+          code: f.airline?.iata || f.airline?.icao || 'UNK',
+          name: f.airline?.name || inferAirlineFromPrefix(qNorm)?.name || 'Unknown Airline',
+        },
+        origin: {
+          code: f.departure?.iata || f.departure?.icao || null,
+          name: f.departure?.airport || null,
+          city: f.departure?.city || null,
+          country: f.departure?.country || null,
+          timezone: f.departure?.timezone || null,
+          latitude: f.departure?.latitude || null,
+          longitude: f.departure?.longitude || null,
+          scheduledTime: f.departure?.scheduled || f.departure?.estimated || null,
+          actualTime: f.departure?.actual || null,
+          terminal: f.departure?.terminal || null,
+          gate: f.departure?.gate || null,
+        },
+        destination: {
+          code: f.arrival?.iata || f.arrival?.icao || null,
+          name: f.arrival?.airport || null,
+          city: f.arrival?.city || null,
+          country: f.arrival?.country || null,
+          timezone: f.arrival?.timezone || null,
+          latitude: f.arrival?.latitude || null,
+          longitude: f.arrival?.longitude || null,
+          scheduledTime: f.arrival?.scheduled || f.arrival?.estimated || null,
+          actualTime: f.arrival?.actual || null,
+          terminal: f.arrival?.terminal || null,
+          gate: f.arrival?.gate || null,
+          baggage: f.arrival?.baggage || null,
+        },
+        status: mapStatus(f.flight_status),
+        aircraft: {
+          registration: f.aircraft?.registration || null,
+          model: f.aircraft?.iata || f.aircraft?.icao || null,
+          icao24: (f.aircraft as any)?.icao24 || null,
+        },
+        live: live ? normalizeLive(live) : null,
+        raw: process.env.NODE_ENV === 'development' ? f : undefined,
+      }
+    }))
+
+    return NextResponse.json({ flights: enriched, debug: debugFlag ? { ...debugInfo, resultCount: enriched.length } : undefined })
+  } catch (err: any) {
+    console.error('Flight search error:', err?.response?.data || err?.message || err)
     
-    let mockFlights = []
+    // Check if it's a subscription plan error
+    const errorCode = err?.response?.data?.error?.code
+    const errorMsg = err?.response?.data?.error?.message
     
-    if (isEZYFlight) {
-      // Create specific mock data for easyJet flights
-      mockFlights = [
-        {
-          id: queryUpper,
-          flightNumber: queryUpper,
-          airline: { code: 'EZY', name: 'easyJet' },
-          origin: {
-            code: 'LGW', name: 'London Gatwick', city: 'London',
-            country: 'UK', latitude: 51.1537, longitude: -0.1821, timezone: 'Europe/London',
-          },
-          destination: {
-            code: 'BCN', name: 'Barcelona-El Prat', city: 'Barcelona',
-            country: 'Spain', latitude: 41.2971, longitude: 2.0833, timezone: 'Europe/Madrid',
-          },
-          status: {
-            scheduled: { departure: new Date(), arrival: new Date(Date.now() + 3600000 * 2) },
-            status: 'departed',
-          },
-          currentPosition: {
-            latitude: 48.5, longitude: 2.0, altitude: 37000, speed: 420, heading: 150, timestamp: new Date(),
-          },
-          aircraft: {
-            type: 'A320', registration: `G-EZ${queryUpper.substring(3)}`, model: 'Airbus A320-214'
-          },
-          createdAt: new Date(), updatedAt: new Date(),
-        }
-      ]
-    } else {
-      // Default mock data for other flights
-      mockFlights = [
-        {
-          id: 'mock_demo_1',
-          flightNumber: queryUpper,
-          airline: { code: 'AA', name: 'American Airlines' },
-          origin: {
-            code: 'JFK', name: 'John F. Kennedy International', city: 'New York',
-            country: 'USA', latitude: 40.6413, longitude: -73.7781, timezone: 'America/New_York',
-          },
-          destination: {
-            code: 'LAX', name: 'Los Angeles International', city: 'Los Angeles',
-            country: 'USA', latitude: 33.9425, longitude: -118.4081, timezone: 'America/Los_Angeles',
-          },
-          status: {
-            scheduled: { departure: new Date(), arrival: new Date(Date.now() + 3600000 * 6) },
-            status: 'departed',
-          },
-          currentPosition: {
-            latitude: 39.7392, longitude: -104.9903, altitude: 35000, speed: 450, heading: 270, timestamp: new Date(),
-          },
-          aircraft: {
-            type: 'B738', registration: 'N12345', model: 'Boeing 737-800'
-          },
-          createdAt: new Date(), updatedAt: new Date(),
-        }
-      ]
+    if (errorCode === 'function_access_restricted') {
+      return NextResponse.json({ 
+        error: 'API Plan Limitation',
+        message: 'Your Aviationstack plan does not support this feature. The FREE plan only supports real-time flight searches without date filtering. Upgrade to Basic plan ($49.99/month) for full features including historical data, routes, and date filtering.',
+        suggestion: 'Try searching without selecting a date, or upgrade your plan at https://aviationstack.com/pricing',
+        details: errorMsg
+      }, { status: 403 })
     }
-
-    return NextResponse.json({
-      flights: mockFlights,
-      total: mockFlights.length,
-      page,
-      pageSize,
-    })
-
-  } catch (error) {
-    console.error('Flight search API error:', error)
-    return NextResponse.json(
-      { error: 'Failed to search flights' },
-      { status: 500 }
-    )
+    
+    if (errorCode === 'https_access_restricted') {
+      return NextResponse.json({ 
+        error: 'HTTPS Not Supported',
+        message: 'The FREE plan does not support HTTPS. Please add AVIATIONSTACK_USE_HTTP=true to your environment variables to use HTTP instead.',
+        suggestion: 'Add AVIATIONSTACK_USE_HTTP=true to your .env file'
+      }, { status: 403 })
+    }
+    
+    return NextResponse.json({ 
+      error: 'Failed to search flights',
+      details: errorMsg || err?.message || 'Unknown error'
+    }, { status: 500 })
   }
 }
 
-const mapFlightStatus = (apiStatus: string): string => {
-  const statusMap: Record<string, string> = {
-    'scheduled': 'scheduled', 'delayed': 'delayed', 'cancelled': 'cancelled',
-    'departed': 'departed', 'arrived': 'arrived', 'diverted': 'diverted',
-    'active': 'departed', 'landed': 'arrived', 'en-route': 'departed',
+// ----------------------------
+// Small helpers
+// ----------------------------
+
+function normalizeLive(a: LiveAircraft) {
+  return {
+    source: (a as any).source || null,
+    callsign: (a.flight || '').trim() || null,
+    hex: a.hex || null,
+    lat: a.lat ?? null,
+    lon: a.lon ?? null,
+    altitudeFt: (a.alt_geom ?? a.alt_baro) ?? null,
+    groundSpeedKt: a.gs ?? null,
+    trackDeg: a.track ?? null,
+    seenSec: a.seen ?? null,
+    seenPosSec: a.seen_pos ?? null,
   }
-  return statusMap[apiStatus.toLowerCase()] || 'scheduled'
+}
+
+function inferAirlineFromPrefix(q: string) {
+  const { airline } = splitAirlineAndNumber(q)
+  if (!airline) return null
+  if (airline.length === 2) {
+    const icao = iataToIcaoAirline(airline)
+    return { code: airline, icao, name: airlineNameGuess(airline, icao) }
+  }
+  if (airline.length === 3) {
+    return { code: airline, name: airlineNameGuess(undefined, airline) }
+  }
+  return null
+}
+
+function airlineNameGuess(iata?: string, icao?: string) {
+  const key = (iata || icao || '').toUpperCase()
+  switch (key) {
+    case 'U2':
+    case 'EZY': return 'easyJet'
+    case 'EZ':  // not a standard IATA, but included above for EZS mapping context
+    case 'EZS': return 'easyJet Switzerland'
+    case 'BA':
+    case 'BAW': return 'British Airways'
+    case 'FR':
+    case 'RYR': return 'Ryanair'
+    default: return 'Unknown Airline'
+  }
 }

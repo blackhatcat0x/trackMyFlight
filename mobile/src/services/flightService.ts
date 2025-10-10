@@ -197,9 +197,9 @@ export const fetchNearbyFlights = async (
       
       return enhancedFlights.filter((flight: Flight | null) => flight !== null) as Flight[];
     }
-  } catch (error) {
-    console.error('All flight APIs failed:', error);
-  }
+    } catch (error) {
+      console.error('Reconnect failed:', (error as Error).message);
+    }
 
   return getMockNearbyFlights(latitude, longitude);
 };
@@ -726,8 +726,8 @@ const getAircraftModel = (type: string): string => {
 
 const getFlightStatus = (altitude?: number, speed?: number): Flight['status']['status'] => {
   if (!altitude || altitude < 100) return 'scheduled';
-  if (altitude > 5000 && speed > 100) return 'departed';
-  if (altitude < 5000 && speed > 50) return 'arrived';
+  if (altitude > 5000 && (speed || 0) > 100) return 'departed';
+  if (altitude < 5000 && (speed || 0) > 50) return 'arrived';
   return 'scheduled';
 };
 

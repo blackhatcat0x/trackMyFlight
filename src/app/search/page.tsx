@@ -129,7 +129,16 @@ export default function SearchPage() {
           setSearchError(msg)
         }
       } else {
-        throw new Error(result.error || 'Search failed')
+        // Handle specific error types
+        if (result.error === 'Aviationstack API Unavailable') {
+          setSearchError(`⚠️ Flight data service temporarily unavailable\n\n${result.message}\n\nPlease try again in a moment.`)
+        } else if (result.error === 'API Plan Limitation') {
+          setSearchError(`${result.message}\n\n💡 ${result.suggestion}`)
+        } else if (result.error === 'HTTPS Not Supported') {
+          setSearchError(`${result.message}\n\n💡 ${result.suggestion}`)
+        } else {
+          throw new Error(result.error || result.message || 'Search failed')
+        }
       }
     } catch (error) {
       console.error('Search failed:', error)

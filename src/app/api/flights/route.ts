@@ -437,7 +437,22 @@ export async function GET(req: NextRequest) {
     const dateToUse = allowDateFilter ? dateParam : undefined
     
     const params = buildAviationParams(qNorm, searchType, airlineHint || undefined, dateToUse)
-    const { data } = await aviationStackApi.get('/flights', { params })
+    
+    let data: any
+    try {
+      const response = await aviationStackApi.get('/flights', { params })
+      data = response.data
+    } catch (apiError: any) {
+      // Handle Aviationstack API errors
+      if (apiError.response?.status === 520 || apiError.response?.status === 503) {
+        return NextResponse.json({
+          error: 'Aviationstack API Unavailable',
+          message: 'The flight data service is temporarily unavailable. Please try again in a few moments.',
+          suggestion: 'The service provider (Aviationstack) is experiencing issues. This should resolve shortly.'
+        }, { status: 503 })
+      }
+      throw apiError
+    }
 
     const flights: AviationFlight[] = Array.isArray(data?.data) ? data.data : []
 
@@ -482,23 +497,132 @@ export async function GET(req: NextRequest) {
     }
 
     if (!results.length) {
-      // Return a helpful empty response instead of generic 200 []
+      // No results from Aviationstack - try live tracking as fallback
+      console.log('Aviationstack returned no results, trying live tracking fallback...')
+      
+      if (searchType === 'flight') {
+        const csVariants = buildVariants(qNorm)
+        let liveData: any = null
+        
+        for (const cs of csVariants) {
+          liveData = await fetchLiveAny(cs)
+          if (liveData) {
+            console.log(`Found live flight: ${cs}`)
+            
+            // Extract airline info from the callsign
+            const airlineInfo = inferAirlineFromPrefix(cs)
+            const airlineCode = airlineInfo?.code || 'UNK'
+            const airlineName = airlineInfo?.name || 'Unknown Airline'
+            
+            // Try to extract airport codes from live data
+            // Airplanes.live doesn't return dep/arr, but other sources might
+            const rawLive = liveData as any
+            const depCode = rawLive.dep_iata || rawLive.dep_icao || null
+            const arrCode = rawLive.arr_iata || rawLive.arr_icao || null
+            
+            // Create a minimal flight object from live data
+            const liveOnlyFlight = {
+              id: `live_${cs}_${Date.now()}`,
+              flightNumber: liveData.flight?.trim() || cs,
+              airline: {
+                code: airlineCode,
+                name: airlineName,
+              },
+              origin: depCode ? {
+                code: depCode,
+                name: null,
+                city: null,
+                country: null,
+                timezone: null,
+                latitude: null,
+                longitude: null,
+                scheduledTime: null,
+                actualTime: null,
+                terminal: null,
+                gate: null,
+              } : {
+                code: null,
+                name: null,
+                city: null,
+                country: null,
+                timezone: null,
+                latitude: null,
+                longitude: null,
+                scheduledTime: null,
+                actualTime: null,
+                terminal: null,
+                gate: null,
+              },
+              destination: arrCode ? {
+                code: arrCode,
+                name: null,
+                city: null,
+                country: null,
+                timezone: null,
+                latitude: null,
+                longitude: null,
+                scheduledTime: null,
+                actualTime: null,
+                terminal: null,
+                gate: null,
+                baggage: null,
+              } : {
+                code: null,
+                name: null,
+                city: null,
+                country: null,
+                timezone: null,
+                latitude: null,
+                longitude: null,
+                scheduledTime: null,
+                actualTime: null,
+                terminal: null,
+                gate: null,
+                baggage: null,
+              },
+              status: 'departed' as const,
+              aircraft: {
+                registration: rawLive.reg_number || liveData.hex || null,
+                model: rawLive.aircraft_icao || null,
+                icao24: liveData.hex || null,
+              },
+              live: normalizeLive(liveData),
+            }
+            
+            return NextResponse.json({
+              flights: [liveOnlyFlight],
+              note: 'Flight not found in Aviationstack, showing live tracking data only. Airport and schedule details may be limited.',
+              source: 'live-only',
+              debug: debugFlag ? { ...debugInfo, liveOnly: true, liveSource: (liveData as any).source } : undefined
+            })
+          }
+        }
+      }
+      
+      // No results from Aviationstack or live tracking
       const typeLabel = searchType === 'route' ? 'route' : searchType === 'airport' ? 'airport' : 'flight'
       return NextResponse.json({
         flights: [],
-        note: `No ${typeLabel}s found for "${query}"${dateParam ? ` on ${dateParam}` : ''}. Check ${searchType} code, date, or try later.`,
+        note: `No ${typeLabel}s found in Aviationstack for "${query}"${dateToUse ? ` on ${dateToUse}` : ''}. Note: Free plan has limited airline coverage. Try searching without a date, or the flight may not be in the database.`,
         debug: debugFlag ? debugInfo : undefined
       })
     }
 
-    // Limit to 10 and map + enrich with live
-    const enriched = await Promise.all(results.slice(0, 10).map(async (f) => {
+    // Map results
+    const mappedFlights = results.map((f) => ({
+      source: 'aviationstack',
+      data: f,
+    }))
+
+    // Enrich with live data and format
+    const enriched = await Promise.all(mappedFlights.slice(0, 10).map(async (item) => {
+      const f = item.data
       const flightIcao = f.flight?.icao?.toUpperCase()
       const flightIata = f.flight?.iata?.toUpperCase()
       const csVariants = buildVariants((flightIcao || flightIata || qNorm))
       let live: any = null
       
-      // Only enrich with live data for flight searches
+      // Get live tracking from Airplanes.live (free, unlimited, best coverage)
       if (searchType === 'flight') {
         for (const cs of csVariants) { 
           live = await fetchLiveAny(cs); 
@@ -506,21 +630,25 @@ export async function GET(req: NextRequest) {
         }
       }
 
+      // Extract airline info - handle both Aviationstack and FlightLabs formats
+      const airlineCode = f.airline?.iata || f.airline?.icao || 'UNK'
+      const airlineName = f.airline?.name || 'Unknown Airline'
+
       return {
         id: `${(f.flight?.iata || f.flight?.icao || f.flight?.number || 'unknown')}_${f.flight_date || ''}`,
         flightNumber: f.flight?.iata || f.flight?.icao || (f.airline?.iata || f.airline?.icao ? `${f.airline?.iata || f.airline?.icao}${f.flight?.number || ''}` : f.flight?.number),
         airline: {
-          code: f.airline?.iata || f.airline?.icao || 'UNK',
-          name: f.airline?.name || inferAirlineFromPrefix(qNorm)?.name || 'Unknown Airline',
+          code: airlineCode,
+          name: airlineName,
         },
         origin: {
           code: f.departure?.iata || f.departure?.icao || null,
           name: f.departure?.airport || null,
-          city: f.departure?.city || null,
-          country: f.departure?.country || null,
+          city: (f.departure as any)?.city || null,
+          country: (f.departure as any)?.country || null,
           timezone: f.departure?.timezone || null,
-          latitude: f.departure?.latitude || null,
-          longitude: f.departure?.longitude || null,
+          latitude: (f.departure as any)?.latitude || null,
+          longitude: (f.departure as any)?.longitude || null,
           scheduledTime: f.departure?.scheduled || f.departure?.estimated || null,
           actualTime: f.departure?.actual || null,
           terminal: f.departure?.terminal || null,
@@ -529,11 +657,11 @@ export async function GET(req: NextRequest) {
         destination: {
           code: f.arrival?.iata || f.arrival?.icao || null,
           name: f.arrival?.airport || null,
-          city: f.arrival?.city || null,
-          country: f.arrival?.country || null,
+          city: (f.arrival as any)?.city || null,
+          country: (f.arrival as any)?.country || null,
           timezone: f.arrival?.timezone || null,
-          latitude: f.arrival?.latitude || null,
-          longitude: f.arrival?.longitude || null,
+          latitude: (f.arrival as any)?.latitude || null,
+          longitude: (f.arrival as any)?.longitude || null,
           scheduledTime: f.arrival?.scheduled || f.arrival?.estimated || null,
           actualTime: f.arrival?.actual || null,
           terminal: f.arrival?.terminal || null,
@@ -546,12 +674,15 @@ export async function GET(req: NextRequest) {
           model: f.aircraft?.iata || f.aircraft?.icao || null,
           icao24: (f.aircraft as any)?.icao24 || null,
         },
-        live: live ? normalizeLive(live) : null,
+        live: live,
         raw: process.env.NODE_ENV === 'development' ? f : undefined,
       }
     }))
 
-    return NextResponse.json({ flights: enriched, debug: debugFlag ? { ...debugInfo, resultCount: enriched.length } : undefined })
+    return NextResponse.json({ 
+      flights: enriched,
+      debug: debugFlag ? { ...debugInfo, resultCount: enriched.length } : undefined 
+    })
   } catch (err: any) {
     console.error('Flight search error:', err?.response?.data || err?.message || err)
     
@@ -599,6 +730,24 @@ function normalizeLive(a: LiveAircraft) {
     trackDeg: a.track ?? null,
     seenSec: a.seen ?? null,
     seenPosSec: a.seen_pos ?? null,
+  }
+}
+
+// Extract airport codes from live data if available
+function getAirportFromLive(iata?: string, icao?: string) {
+  if (!iata && !icao) return null
+  return {
+    code: iata || icao || null,
+    name: null,
+    city: null,
+    country: null,
+    timezone: null,
+    latitude: null,
+    longitude: null,
+    scheduledTime: null,
+    actualTime: null,
+    terminal: null,
+    gate: null,
   }
 }
 

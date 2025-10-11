@@ -30,17 +30,17 @@ export default function Home() {
       <div className="relative z-10 flex flex-col items-center justify-center min-h-screen gap-8 p-4">
         {/* Logo and Header */}
         <div className="text-center">
-          <div className="mb-6 relative">
+          <div className="mb-6 relative flex justify-center">
             <div className="absolute inset-0 bg-blue-400 rounded-full blur-2xl opacity-30 animate-pulse"></div>
-            <Image 
-              src="/img/logo.png" 
-              alt="TrackMyFlight Logo" 
-              width={120} 
-              height={120}
-              className="relative z-10 mx-auto rounded-full shadow-2xl border-4 border-white/20"
-            />
+                    <Image
+                      src="/img/page-logo.png"
+                      alt="TrackMyFlight Logo"
+                      width={200}
+                      height={121}
+                      className="object-contain h-full"
+                    />
           </div>
-          <h1 className="text-6xl font-bold text-white mb-4 drop-shadow-2xl">
+          <h1 className="text-6xl font-bold text-white mb-4 drop-shadow-2xl hidden">
             TrackMyFlight
           </h1>
           <p className="text-xl text-blue-100 text-center max-w-2xl drop-shadow-lg">

@@ -31,7 +31,7 @@ export interface Aircraft {
 }
 
 export interface FlightStatus {
-  scheduled: {
+  scheduled?: {  // Made optional with ?
     departure: Date;
     arrival: Date;
   };
@@ -52,7 +52,7 @@ export interface FlightStatus {
     arrival: string;
   };
   baggageClaim?: string;
-  status: 'scheduled' | 'delayed' | 'cancelled' | 'departed' | 'arrived' | 'diverted';
+  status: 'scheduled' | 'delayed' | 'cancelled' | 'departed' | 'arrived' | 'diverted' | 'unknown';  // Added 'unknown'
   delayMinutes?: number;
 }
 

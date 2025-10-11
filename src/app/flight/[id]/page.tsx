@@ -1,141 +1,180 @@
+//flight/[id]/page.tsx
 'use client'
 
 import { FlightTracker } from '@/components/FlightTracker'
-import { useRealTimeFlightTracking } from '@/hooks/useRealTimeFlightTracking'
+import { Flight } from '@/types/flight'
 import Image from 'next/image'
 import { useRouter } from 'next/navigation'
-import { useEffect, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 
-// Define Flight interface locally
-interface FlightPosition {
-  latitude: number
-  longitude: number
-  altitude: number
-  speed: number
-  heading: number
-  timestamp: Date
+interface ExtendedFlight extends Flight {
+  live?: {
+    source?: string | null
+    callsign?: string | null
+    lat?: number | null
+    lon?: number | null
+    altitudeFt?: number | null
+    groundSpeedKt?: number | null
+    trackDeg?: number | null
+  }
 }
 
-interface Flight {
-  id: string
-  flightNumber: string
-  callsign?: string
-  airline: {
-    code: string
-    name: string
+const extractFlightNumber = (flightId: string): string => {
+  if (flightId.startsWith('live_')) {
+    const parts = flightId.split('_')
+    return parts[1] || flightId
   }
-  origin: {
-    code: string
-    name: string
-    city: string
-    country: string
-    latitude: number
-    longitude: number
-    timezone: string
-  }
-  destination: {
-    code: string
-    name: string
-    city: string
-    country: string
-    latitude: number
-    longitude: number
-    timezone: string
-  }
-  aircraft?: {
-    type: string
-    registration: string
-    model: string
-  }
-  status: {
-    scheduled: {
-      departure: Date
-      arrival: Date
-    }
-    estimated?: {
-      departure: Date
-      arrival: Date
-    }
-    status: 'scheduled' | 'departed' | 'arrived' | 'delayed' | 'cancelled' | 'diverted'
-  }
-  currentPosition?: FlightPosition
-  createdAt: Date
-  updatedAt: Date
+  const parts = flightId.split('_')
+  return parts[0] || flightId
 }
 
-// Define getFlightDetails function locally
-const getFlightDetails = async (flightId: string): Promise<Flight | null> => {
-  try {
-    const response = await fetch(`/api/flights?search=${flightId}&page=1&pageSize=1`)
-    if (response.ok) {
-      const result = await response.json()
-      return result.flights?.[0] || null
-    }
-    return null
-  } catch (error) {
-    console.error('Failed to fetch flight details:', error)
-    return null
-  }
+const transformFlightData = (apiData: any): ExtendedFlight => {
+  const now = new Date();
+  
+  const originCode = apiData.origin?.code || apiData.departure?.iata || 'UNK';
+  const destCode = apiData.destination?.code || apiData.arrival?.iata || 'UNK';
+  
+  const baseFlight: Flight = {
+    id: apiData.id,
+    flightNumber: apiData.flightNumber,
+    callsign: apiData.live?.callsign || apiData.callsign || undefined,
+    airline: {
+      code: apiData.airline?.code || 'UNK',
+      name: apiData.airline?.name || 'Unknown Airline',
+    },
+    origin: {
+      code: originCode,
+      name: apiData.origin?.name || apiData.departure?.airport || 'Unknown Airport',
+      city: apiData.origin?.city || 'Unknown City',
+      country: apiData.origin?.country || 'Unknown Country',
+      latitude: apiData.origin?.latitude || 0,
+      longitude: apiData.origin?.longitude || 0,
+      timezone: apiData.origin?.timezone || 'UTC',
+    },
+    destination: {
+      code: destCode,
+      name: apiData.destination?.name || apiData.arrival?.airport || 'Unknown Airport',
+      city: apiData.destination?.city || 'Unknown City',
+      country: apiData.destination?.country || 'Unknown Country',
+      latitude: apiData.destination?.latitude || 0,
+      longitude: apiData.destination?.longitude || 0,
+      timezone: apiData.destination?.timezone || 'UTC',
+    },
+    aircraft: apiData.aircraft ? {
+      type: apiData.aircraft.model || apiData.aircraft.type || 'Unknown',
+      registration: apiData.aircraft.registration || 'Unknown',
+      model: apiData.aircraft.model || 'Unknown',
+    } : undefined,
+    status: {
+      scheduled: apiData.origin?.scheduledTime && apiData.destination?.scheduledTime ? {
+        departure: new Date(apiData.origin.scheduledTime),
+        arrival: new Date(apiData.destination.scheduledTime),
+      } : undefined,
+      estimated: apiData.origin?.actualTime && apiData.destination?.actualTime ? {
+        departure: new Date(apiData.origin.actualTime),
+        arrival: new Date(apiData.destination.actualTime),
+      } : undefined,
+      status: apiData.status || 'departed',
+    },
+    currentPosition: apiData.live && apiData.live.lat && apiData.live.lon ? {
+      latitude: apiData.live.lat,
+      longitude: apiData.live.lon,
+      altitude: apiData.live.altitudeFt || 0,
+      speed: apiData.live.groundSpeedKt || 0,
+      heading: apiData.live.trackDeg || 0,
+      timestamp: new Date(),
+    } : undefined,
+    route: {
+      points: [
+        [apiData.origin?.longitude || 0, apiData.origin?.latitude || 0],
+        [apiData.destination?.longitude || 0, apiData.destination?.latitude || 0]
+      ],
+      distance: 0,
+      estimatedDuration: 0,
+    },
+    createdAt: apiData.createdAt ? new Date(apiData.createdAt) : now,
+    updatedAt: apiData.updatedAt ? new Date(apiData.updatedAt) : now,
+  };
+
+  return {
+    ...baseFlight,
+    live: apiData.live,
+  };
 }
 
 export default function FlightDetailPage({ params }: { params: { id: string } }) {
-  const [flight, setFlight] = useState<Flight | null>(null)
+  const [flight, setFlight] = useState<ExtendedFlight | null>(null)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
   const router = useRouter()
-
-  // Real-time flight tracking
-  const {
-    currentPosition,
-    trackingState,
-    isTracking,
-    startTracking,
-    stopTracking,
-    toggleTracking,
-    connectionStatus,
-  } = useRealTimeFlightTracking(flight, {
-    autoStart: true,
-    onPositionChange: (position) => {
-      if (flight) {
-        setFlight(prev => prev ? {
-          ...prev,
-          currentPosition: position,
-          updatedAt: new Date(),
-        } : null)
-      }
-    },
-  })
+  
+  const isFetchingRef = useRef(false);
+  const hasFetchedRef = useRef(false);
 
   useEffect(() => {
+    if (isFetchingRef.current || hasFetchedRef.current) {
+      console.log('⏭️ Skipping fetch - already done');
+      return;
+    }
+
     const fetchFlightDetails = async () => {
+      console.log('🔄 Fetching flight details...');
+      isFetchingRef.current = true;
+      
       try {
         setLoading(true)
-        const flightData = await getFlightDetails(params.id)
-        if (flightData) {
-          setFlight(flightData)
-        } else {
-          setError('Flight not found')
+        setError(null)
+        
+        const flightNumber = extractFlightNumber(params.id)
+        console.log('Flight number:', flightNumber)
+        
+        const response = await fetch(`/api/flights?query=${encodeURIComponent(flightNumber)}&type=flight`)
+        
+        if (!response.ok) {
+          if (response.status === 429) {
+            setError('Too many requests. Please wait a moment.')
+            return;
+          }
+          throw new Error(`HTTP ${response.status}`)
         }
+        
+        const result = await response.json()
+        const flights = result.flights || []
+        
+        if (flights.length === 0) {
+          setError('Flight not found')
+          return
+        }
+        
+        const flightData = flights[0]
+        const transformed = transformFlightData(flightData)
+        
+        if (transformed && transformed.flightNumber) {
+          setFlight(transformed)
+          hasFetchedRef.current = true;
+          console.log('✅ Flight loaded successfully');
+        } else {
+          setError('Invalid flight data')
+        }
+        
       } catch (err) {
-        console.error('Failed to fetch flight details:', err)
-        setError('Failed to load flight details')
+        console.error('❌ Fetch error:', err)
+        setError(err instanceof Error ? err.message : 'Failed to load flight')
       } finally {
         setLoading(false)
+        isFetchingRef.current = false;
       }
     }
 
     fetchFlightDetails()
   }, [params.id])
 
-  const handleBack = () => {
-    router.push('/search')
-  }
+  const handleBack = () => router.push('/search')
 
-  const formatTime = (date: Date | string) => {
+  const formatTime = (date: Date | string | undefined) => {
+    if (!date) return 'N/A'
     const dateObj = typeof date === 'string' ? new Date(date) : date
-    if (isNaN(dateObj.getTime())) {
-      return 'N/A'
-    }
+    if (isNaN(dateObj.getTime())) return 'N/A'
     return new Intl.DateTimeFormat('en-US', {
       hour: '2-digit',
       minute: '2-digit',
@@ -143,11 +182,10 @@ export default function FlightDetailPage({ params }: { params: { id: string } })
     }).format(dateObj)
   }
 
-  const formatDate = (date: Date | string) => {
+  const formatDate = (date: Date | string | undefined) => {
+    if (!date) return 'N/A'
     const dateObj = typeof date === 'string' ? new Date(date) : date
-    if (isNaN(dateObj.getTime())) {
-      return 'N/A'
-    }
+    if (isNaN(dateObj.getTime())) return 'N/A'
     return new Intl.DateTimeFormat('en-US', {
       weekday: 'short',
       month: 'short',
@@ -172,7 +210,7 @@ export default function FlightDetailPage({ params }: { params: { id: string } })
         <div className="text-center">
           <div className="text-6xl mb-4">✈️</div>
           <h2 className="text-2xl font-bold text-white mb-2">Flight Not Found</h2>
-          <p className="text-blue-200 mb-6">{error || 'This flight could not be found'}</p>
+          <p className="text-blue-200 mb-6">{error || 'Could not load flight'}</p>
           <button
             onClick={handleBack}
             className="bg-gradient-to-r from-blue-500 to-cyan-500 hover:from-blue-600 hover:to-cyan-600 text-white font-bold py-3 px-6 rounded-lg transition-all"
@@ -184,17 +222,16 @@ export default function FlightDetailPage({ params }: { params: { id: string } })
     )
   }
 
+  const isLiveOnly = !flight.status.scheduled
+
   return (
     <div className="min-h-screen bg-gradient-to-br from-slate-900 via-blue-900 to-slate-900">
-      {/* Animated background elements */}
       <div className="fixed inset-0 overflow-hidden">
         <div className="absolute -top-40 -right-40 w-80 h-80 bg-blue-500 rounded-full mix-blend-multiply filter blur-xl opacity-20 animate-pulse"></div>
         <div className="absolute -bottom-40 -left-40 w-80 h-80 bg-purple-500 rounded-full mix-blend-multiply filter blur-xl opacity-20 animate-pulse"></div>
       </div>
 
-      {/* Main content */}
       <div className="relative z-10 min-h-screen">
-        {/* Header */}
         <div className="bg-white/10 backdrop-blur-md border-b border-white/20">
           <div className="max-w-4xl mx-auto px-4 py-4">
             <div className="flex items-center gap-4">
@@ -220,9 +257,24 @@ export default function FlightDetailPage({ params }: { params: { id: string } })
           </div>
         </div>
 
-        {/* Flight Details */}
         <div className="max-w-4xl mx-auto px-4 py-8">
-          {/* Main flight card */}
+          {isLiveOnly && (
+            <div className="bg-yellow-500/20 border border-yellow-500/50 rounded-lg p-4 mb-6">
+              <div className="flex items-start gap-3">
+                <div className="text-2xl">ℹ️</div>
+                <div>
+                  <h3 className="text-yellow-200 font-medium mb-1">Live Tracking Only</h3>
+                  <p className="text-yellow-100 text-sm">
+                    This flight is tracked via live ADS-B data. Schedule info may be limited.
+                    {flight.live?.source && (
+                      <span className="block mt-1">Source: {flight.live.source}</span>
+                    )}
+                  </p>
+                </div>
+              </div>
+            </div>
+          )}
+
           <div className="bg-white/10 backdrop-blur-md rounded-2xl shadow-2xl p-8 border border-white/20 mb-6">
             <div className="flex items-center justify-between mb-6">
               <div className="flex items-center gap-4">
@@ -230,22 +282,22 @@ export default function FlightDetailPage({ params }: { params: { id: string } })
                 <div>
                   <h2 className="text-3xl font-bold text-white">{flight.flightNumber}</h2>
                   <p className="text-blue-200">{flight.airline.name}</p>
+                  {flight.callsign && flight.callsign !== flight.flightNumber && (
+                    <p className="text-sm text-blue-300">Callsign: {flight.callsign}</p>
+                  )}
                 </div>
               </div>
-              <div className="text-right">
-                <span className={`inline-block px-3 py-1 rounded-full text-sm font-medium ${
-                  flight.status.status === 'departed' ? 'bg-green-500/30 text-green-300' :
-                  flight.status.status === 'arrived' ? 'bg-blue-500/30 text-blue-300' :
-                  flight.status.status === 'delayed' ? 'bg-orange-500/30 text-orange-300' :
-                  flight.status.status === 'cancelled' ? 'bg-red-500/30 text-red-300' :
-                  'bg-gray-500/30 text-gray-300'
-                }`}>
-                  {flight.status.status.charAt(0).toUpperCase() + flight.status.status.slice(1)}
-                </span>
-              </div>
+              <span className={`inline-block px-3 py-1 rounded-full text-sm font-medium ${
+                flight.status.status === 'departed' ? 'bg-green-500/30 text-green-300' :
+                flight.status.status === 'arrived' ? 'bg-blue-500/30 text-blue-300' :
+                flight.status.status === 'delayed' ? 'bg-orange-500/30 text-orange-300' :
+                flight.status.status === 'cancelled' ? 'bg-red-500/30 text-red-300' :
+                'bg-gray-500/30 text-gray-300'
+              }`}>
+                {flight.status.status.charAt(0).toUpperCase() + flight.status.status.slice(1)}
+              </span>
             </div>
 
-            {/* Route */}
             <div className="grid grid-cols-3 gap-4 items-center mb-8">
               <div className="text-center">
                 <div className="text-2xl font-bold text-white">{flight.origin.code}</div>
@@ -254,7 +306,6 @@ export default function FlightDetailPage({ params }: { params: { id: string } })
               </div>
               <div className="text-center">
                 <div className="text-blue-400 text-2xl">→</div>
-                <div className="text-xs text-blue-300 mt-1">Route</div>
               </div>
               <div className="text-center">
                 <div className="text-2xl font-bold text-white">{flight.destination.code}</div>
@@ -263,39 +314,29 @@ export default function FlightDetailPage({ params }: { params: { id: string } })
               </div>
             </div>
 
-            {/* Schedule */}
-            <div className="grid grid-cols-2 gap-6 mb-6">
-              <div className="bg-white/5 rounded-lg p-4 border border-white/10">
-                <h3 className="text-sm font-medium text-blue-200 mb-2">Departure</h3>
-                <div className="text-xl font-bold text-white">
-                  {formatTime(flight.status.scheduled.departure)}
-                </div>
-                <div className="text-sm text-blue-200">
-                  {formatDate(flight.status.scheduled.departure)}
-                </div>
-                {flight.status.estimated?.departure && (
-                  <div className="text-xs text-orange-300 mt-1">
-                    Est: {formatTime(flight.status.estimated.departure)}
+            {flight.status.scheduled && (
+              <div className="grid grid-cols-2 gap-6 mb-6">
+                <div className="bg-white/5 rounded-lg p-4 border border-white/10">
+                  <h3 className="text-sm font-medium text-blue-200 mb-2">Departure</h3>
+                  <div className="text-xl font-bold text-white">
+                    {formatTime(flight.status.scheduled.departure)}
                   </div>
-                )}
-              </div>
-              <div className="bg-white/5 rounded-lg p-4 border border-white/10">
-                <h3 className="text-sm font-medium text-blue-200 mb-2">Arrival</h3>
-                <div className="text-xl font-bold text-white">
-                  {formatTime(flight.status.scheduled.arrival)}
-                </div>
-                <div className="text-sm text-blue-200">
-                  {formatDate(flight.status.scheduled.arrival)}
-                </div>
-                {flight.status.estimated?.arrival && (
-                  <div className="text-xs text-orange-300 mt-1">
-                    Est: {formatTime(flight.status.estimated.arrival)}
+                  <div className="text-sm text-blue-200">
+                    {formatDate(flight.status.scheduled.departure)}
                   </div>
-                )}
+                </div>
+                <div className="bg-white/5 rounded-lg p-4 border border-white/10">
+                  <h3 className="text-sm font-medium text-blue-200 mb-2">Arrival</h3>
+                  <div className="text-xl font-bold text-white">
+                    {formatTime(flight.status.scheduled.arrival)}
+                  </div>
+                  <div className="text-sm text-blue-200">
+                    {formatDate(flight.status.scheduled.arrival)}
+                  </div>
+                </div>
               </div>
-            </div>
+            )}
 
-            {/* Current Position */}
             {flight.currentPosition && (
               <div className="bg-white/5 rounded-lg p-4 border border-white/10">
                 <h3 className="text-sm font-medium text-blue-200 mb-3">Current Position</h3>
@@ -303,7 +344,7 @@ export default function FlightDetailPage({ params }: { params: { id: string } })
                   <div>
                     <div className="text-xs text-blue-300">Altitude</div>
                     <div className="text-lg font-bold text-white">
-                      {Math.round(flight.currentPosition.altitude)}ft
+                      {Math.round(flight.currentPosition.altitude).toLocaleString()}ft
                     </div>
                   </div>
                   <div>
@@ -319,9 +360,9 @@ export default function FlightDetailPage({ params }: { params: { id: string } })
                     </div>
                   </div>
                   <div>
-                    <div className="text-xs text-blue-300">Updated</div>
-                    <div className="text-lg font-bold text-white">
-                      {formatTime(flight.currentPosition.timestamp)}
+                    <div className="text-xs text-blue-300">Position</div>
+                    <div className="text-sm font-bold text-white">
+                      {flight.currentPosition.latitude.toFixed(2)}, {flight.currentPosition.longitude.toFixed(2)}
                     </div>
                   </div>
                 </div>
@@ -329,83 +370,33 @@ export default function FlightDetailPage({ params }: { params: { id: string } })
             )}
           </div>
 
-          {/* Real-time Flight Tracking Map */}
           {flight.currentPosition && (
             <div className="bg-white/10 backdrop-blur-md rounded-2xl shadow-2xl p-6 border border-white/20 mb-6">
-              <div className="flex items-center justify-between mb-4">
-                <h3 className="text-xl font-bold text-white">Live Flight Tracking</h3>
-                <div className="flex items-center gap-2">
-                  <div className={`w-2 h-2 rounded-full ${
-                    connectionStatus === 'connected' ? 'bg-green-400 animate-pulse' :
-                    connectionStatus === 'connecting' ? 'bg-yellow-400 animate-pulse' :
-                    'bg-red-400'
-                  }`}></div>
-                  <span className="text-xs text-blue-200 capitalize">{connectionStatus}</span>
-                </div>
-              </div>
-              
-              {/* Map container */}
-              <div className="relative h-96 rounded-lg overflow-hidden mb-4">
+              <h3 className="text-xl font-bold text-white mb-4">Live Flight Tracking</h3>
+              <div className="relative h-96 rounded-lg overflow-hidden">
                 <FlightTracker
                   flight={flight}
                   showRoute={true}
-                  onPositionUpdate={(position: FlightPosition) => {
-                    setFlight(prev => prev ? {
-                      ...prev,
-                      currentPosition: position,
-                      updatedAt: new Date(),
-                    } : null)
-                  }}
                   className="w-full h-full"
                 />
-              </div>
-
-              {/* Tracking controls */}
-              <div className="flex items-center justify-between">
-                <div className="text-sm text-blue-200">
-                  {isTracking ? 'Live tracking active' : 'Tracking paused'}
-                  {trackingState.lastUpdate && (
-                    <span className="ml-2">
-                      • Updated {formatTime(trackingState.lastUpdate)}
-                    </span>
-                  )}
-                </div>
-                <button
-                  onClick={toggleTracking}
-                  className={`px-4 py-2 rounded-lg text-sm font-medium transition-all ${
-                    isTracking
-                      ? 'bg-red-500/20 text-red-300 hover:bg-red-500/30 border border-red-500/30'
-                      : 'bg-green-500/20 text-green-300 hover:bg-green-500/30 border border-green-500/30'
-                  }`}
-                >
-                  {isTracking ? 'Pause Tracking' : 'Resume Tracking'}
-                </button>
               </div>
             </div>
           )}
 
-          {/* Aircraft Info */}
           {flight.aircraft && (
             <div className="bg-white/10 backdrop-blur-md rounded-2xl shadow-2xl p-6 border border-white/20 mb-6">
               <h3 className="text-xl font-bold text-white mb-4">Aircraft Information</h3>
               <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                <div className="bg-white/5 rounded-lg p-3 border border-white/10">
-                  <div className="text-xs text-blue-300">Type</div>
-                  <div className="text-sm font-medium text-white">{flight.aircraft.type}</div>
-                </div>
-                <div className="bg-white/5 rounded-lg p-3 border border-white/10">
-                  <div className="text-xs text-blue-300">Registration</div>
-                  <div className="text-sm font-medium text-white">{flight.aircraft.registration}</div>
-                </div>
-                <div className="bg-white/5 rounded-lg p-3 border border-white/10">
-                  <div className="text-xs text-blue-300">Model</div>
-                  <div className="text-sm font-medium text-white">{flight.aircraft.model}</div>
-                </div>
+                {flight.aircraft.registration && (
+                  <div className="bg-white/5 rounded-lg p-3 border border-white/10">
+                    <div className="text-xs text-blue-300">Registration</div>
+                    <div className="text-sm font-medium text-white">{flight.aircraft.registration}</div>
+                  </div>
+                )}
               </div>
             </div>
           )}
 
-          {/* Actions */}
           <div className="flex gap-4">
             <button
               onClick={handleBack}
@@ -415,10 +406,8 @@ export default function FlightDetailPage({ params }: { params: { id: string } })
             </button>
             <button
               onClick={() => {
-                // Copy flight details to clipboard
                 const details = `${flight.flightNumber} - ${flight.airline.name}\n${flight.origin.code} → ${flight.destination.code}\nStatus: ${flight.status.status}`
                 navigator.clipboard.writeText(details)
-                alert('Flight details copied to clipboard!')
               }}
               className="flex-1 bg-gradient-to-r from-blue-500 to-cyan-500 hover:from-blue-600 hover:to-cyan-600 text-white font-bold py-3 px-6 rounded-xl transition-all"
             >

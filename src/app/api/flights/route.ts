@@ -1,3 +1,4 @@
+// src/app/api/flights/route.ts
 import axios, { AxiosInstance } from 'axios'
 import { NextRequest, NextResponse } from 'next/server'
 
@@ -116,12 +117,19 @@ function makeAirplanesLiveCallsign(q: string): string | undefined {
 const aviationStackApi: AxiosInstance = axios.create({
   baseURL: 'https://api.aviationstack.com/v1',
   timeout: 15000,
+  headers: { 
+    'User-Agent': 'TrackMyFlight-App/1.0',
+    'Connection': 'keep-alive'
+  },
 })
 
 const airplanesLiveApi: AxiosInstance = axios.create({
   baseURL: 'https://api.airplanes.live/v2',
   timeout: 12000,
-  headers: { 'User-Agent': 'TrackMyFlight-App/1.0' },
+  headers: { 
+    'User-Agent': 'TrackMyFlight-App/1.0',
+    'Connection': 'keep-alive'
+  },
 })
 
 // ----------------------------
@@ -378,16 +386,206 @@ async function fetchLiveByCallsignOpenSky(callsign: string): Promise<LiveAircraf
 // ----------------------------
 
 async function fetchLiveAny(callsign: string): Promise<LiveAircraft | null> {
+  console.log(`Trying to fetch live data for ${callsign} from multiple sources...`)
+  
   // 1) Airplanes.live
-  const a = await fetchLiveByCallsign(callsign)
-  if (a) return { ...a, source: 'airplanes.live' } as any
+  try {
+    console.log(`Trying Airplanes.live for ${callsign}...`)
+    const a = await fetchLiveByCallsign(callsign)
+    if (a) {
+      console.log(`✓ Found live data from Airplanes.live for ${callsign}`)
+      return { ...a, source: 'airplanes.live' } as any
+    }
+    console.log(`✗ No data from Airplanes.live for ${callsign}`)
+  } catch (error) {
+    console.log(`✗ Airplanes.live failed for ${callsign}:`, error instanceof Error ? error.message : error)
+  }
+  
   // 2) ADS-B Exchange (if configured)
-  const b = await fetchLiveByCallsignAdsbx(callsign)
-  if (b) return { ...b, source: 'adsbx' } as any
+  try {
+    console.log(`Trying ADS-B Exchange for ${callsign}...`)
+    const b = await fetchLiveByCallsignAdsbx(callsign)
+    if (b) {
+      console.log(`✓ Found live data from ADS-B Exchange for ${callsign}`)
+      return { ...b, source: 'adsbx' } as any
+    }
+    console.log(`✗ No data from ADS-B Exchange for ${callsign}`)
+  } catch (error) {
+    console.log(`✗ ADS-B Exchange failed for ${callsign}:`, error instanceof Error ? error.message : error)
+  }
+  
   // 3) OpenSky
-  const c = await fetchLiveByCallsignOpenSky(callsign)
-  if (c) return { ...c, source: 'opensky' } as any
+  try {
+    console.log(`Trying OpenSky for ${callsign}...`)
+    const c = await fetchLiveByCallsignOpenSky(callsign)
+    if (c) {
+      console.log(`✓ Found live data from OpenSky for ${callsign}`)
+      return { ...c, source: 'opensky' } as any
+    }
+    console.log(`✗ No data from OpenSky for ${callsign}`)
+  } catch (error) {
+    console.log(`✗ OpenSky failed for ${callsign}:`, error instanceof Error ? error.message : error)
+  }
+  
+  console.log(`✗ No live data found for ${callsign} from any source`)
   return null
+}
+
+// ----------------------------
+// Simple rate limiting
+// ----------------------------
+
+const requestCache = new Map<string, { count: number; resetTime: number; lastRequest: number }>()
+const RATE_LIMIT_WINDOW = 60000 // 1 minute
+const MAX_REQUESTS_PER_WINDOW = 10 // Reduced from 30 to 10 requests per minute per IP
+const MIN_REQUEST_INTERVAL = 5000 // Minimum 5 seconds between requests from same IP
+
+function checkRateLimit(ip: string): boolean {
+  const now = Date.now()
+  const existing = requestCache.get(ip)
+  
+  if (!existing || now > existing.resetTime) {
+    // Reset or create new entry
+    requestCache.set(ip, {
+      count: 1,
+      resetTime: now + RATE_LIMIT_WINDOW,
+      lastRequest: now
+    })
+    return true
+  }
+  
+  // Check minimum interval between requests
+  if (now - existing.lastRequest < MIN_REQUEST_INTERVAL) {
+    console.log(`Rate limiting: ${ip} requesting too frequently (interval: ${now - existing.lastRequest}ms)`)
+    return false
+  }
+  
+  if (existing.count >= MAX_REQUESTS_PER_WINDOW) {
+    console.log(`Rate limiting: ${ip} exceeded max requests per window (${existing.count}/${MAX_REQUESTS_PER_WINDOW})`)
+    return false
+  }
+  
+  existing.count++
+  existing.lastRequest = now
+  return true
+}
+
+// ----------------------------
+// Live-only tracking handler
+// ----------------------------
+
+async function handleLiveOnlyTracking(
+  qNorm: string, 
+  searchType: 'flight' | 'route' | 'airport', 
+  debugFlag: boolean, 
+  debugInfo?: any
+) {
+  console.log('Using live-only tracking due to Aviationstack limitations...')
+  
+  if (searchType === 'flight') {
+    const csVariants = buildVariants(qNorm)
+    let liveData: any = null
+    
+    for (const cs of csVariants) {
+      liveData = await fetchLiveAny(cs)
+      if (liveData) {
+        console.log(`Found live flight: ${cs}`)
+        
+        // Extract airline info from the callsign
+        const airlineInfo = inferAirlineFromPrefix(cs)
+        const airlineCode = airlineInfo?.code || 'UNK'
+        const airlineName = airlineInfo?.name || 'Unknown Airline'
+        
+        // Try to extract airport codes from live data
+        const rawLive = liveData as any
+        const depCode = rawLive.dep_iata || rawLive.dep_icao || null
+        const arrCode = rawLive.arr_iata || rawLive.arr_icao || null
+        
+        // Create a minimal flight object from live data
+        const liveOnlyFlight = {
+          id: `live_${cs}_${Date.now()}`,
+          flightNumber: liveData.flight?.trim() || cs,
+          airline: {
+            code: airlineCode,
+            name: airlineName,
+          },
+          origin: depCode ? {
+            code: depCode,
+            name: null,
+            city: null,
+            country: null,
+            timezone: null,
+            latitude: null,
+            longitude: null,
+            scheduledTime: null,
+            actualTime: null,
+            terminal: null,
+            gate: null,
+          } : {
+            code: null,
+            name: null,
+            city: null,
+            country: null,
+            timezone: null,
+            latitude: null,
+            longitude: null,
+            scheduledTime: null,
+            actualTime: null,
+            terminal: null,
+            gate: null,
+          },
+          destination: arrCode ? {
+            code: arrCode,
+            name: null,
+            city: null,
+            country: null,
+            timezone: null,
+            latitude: null,
+            longitude: null,
+            scheduledTime: null,
+            actualTime: null,
+            terminal: null,
+            gate: null,
+            baggage: null,
+          } : {
+            code: null,
+            name: null,
+            city: null,
+            country: null,
+            timezone: null,
+            latitude: null,
+            longitude: null,
+            scheduledTime: null,
+            actualTime: null,
+            terminal: null,
+            gate: null,
+            baggage: null,
+          },
+          status: 'departed' as const,
+          aircraft: {
+            registration: rawLive.reg_number || liveData.hex || null,
+            model: rawLive.aircraft_icao || null,
+            icao24: liveData.hex || null,
+          },
+          live: normalizeLive(liveData),
+        }
+        
+        return NextResponse.json({
+          flights: [liveOnlyFlight],
+          note: 'Aviationstack usage limit reached. Showing live tracking data only. Airport and schedule details may be limited.',
+          source: 'live-only',
+          debug: debugFlag ? { ...debugInfo, liveOnly: true, liveSource: (liveData as any).source } : undefined
+        })
+      }
+    }
+  }
+  
+  // No live data found
+  return NextResponse.json({
+    flights: [],
+    note: `No live data found for "${qNorm}". Aviationstack usage limit reached and no live tracking data available.`,
+    debug: debugFlag ? debugInfo : undefined
+  })
 }
 
 // ----------------------------
@@ -402,11 +600,33 @@ export async function GET(req: NextRequest) {
   const dateParam = (searchParams.get('date') || '').trim()
   const debugFlag = searchParams.get('debug') === '1' || process.env.DEBUG_FLIGHTS === '1'
 
+  // Simple rate limiting based on IP
+  const ip = req.headers.get('x-forwarded-for') || req.headers.get('x-real-ip') || 'unknown'
+  if (!checkRateLimit(ip)) {
+    return NextResponse.json({
+      error: 'Rate Limit Exceeded',
+      message: 'Too many requests. Please wait a moment before trying again.',
+      retryAfter: Math.ceil(RATE_LIMIT_WINDOW / 1000)
+    }, { 
+      status: 429,
+      headers: {
+        'Retry-After': Math.ceil(RATE_LIMIT_WINDOW / 1000).toString()
+      }
+    })
+  }
+
   if (!query.trim()) {
     return NextResponse.json({ error: 'Missing ?query=' }, { status: 400 })
   }
 
   const qNorm = normalizeQuery(query)
+
+  // Build debug info early to avoid declaration issues
+  const allowDateFilter = process.env.AVIATIONSTACK_ALLOW_DATE_FILTER === 'true'
+  const dateToUse = allowDateFilter ? dateParam : undefined
+  const params = buildAviationParams(qNorm, searchType, airlineHint || undefined, dateToUse)
+  const candidates = buildVariants(qNorm)
+  const debugInfo: any = debugFlag ? { qNorm, searchType, candidates, params } : undefined
 
   // If no Aviationstack key, short-circuit to live-only enrichment using callsign
   const noAviationKey = !process.env.NEXT_PUBLIC_AVIATIONSTACK_API_KEY
@@ -433,10 +653,6 @@ export async function GET(req: NextRequest) {
   try {
     // IMPORTANT: Don't pass date to buildAviationParams unless explicitly allowed
     // Free plan does NOT support date filtering
-    const allowDateFilter = process.env.AVIATIONSTACK_ALLOW_DATE_FILTER === 'true'
-    const dateToUse = allowDateFilter ? dateParam : undefined
-    
-    const params = buildAviationParams(qNorm, searchType, airlineHint || undefined, dateToUse)
     
     let data: any
     try {
@@ -444,6 +660,15 @@ export async function GET(req: NextRequest) {
       data = response.data
     } catch (apiError: any) {
       // Handle Aviationstack API errors
+      const errorCode = apiError?.response?.data?.error?.code
+      const errorMessage = apiError?.response?.data?.error?.message
+      
+      if (errorCode === 'usage_limit_reached') {
+        console.log('Aviationstack usage limit reached, using live-only tracking...')
+        // Skip Aviationstack and go straight to live tracking
+        return await handleLiveOnlyTracking(qNorm, searchType, debugFlag, debugInfo)
+      }
+      
       if (apiError.response?.status === 520 || apiError.response?.status === 503) {
         return NextResponse.json({
           error: 'Aviationstack API Unavailable',
@@ -451,15 +676,12 @@ export async function GET(req: NextRequest) {
           suggestion: 'The service provider (Aviationstack) is experiencing issues. This should resolve shortly.'
         }, { status: 503 })
       }
+      
+      console.error('Aviationstack API error:', errorCode, errorMessage)
       throw apiError
     }
 
     const flights: AviationFlight[] = Array.isArray(data?.data) ? data.data : []
-
-    // Build candidate identifiers from user query to improve precision (handles suffix letters)
-    const candidates = buildVariants(qNorm)
-
-    const debugInfo: any = debugFlag ? { qNorm, searchType, candidates, params } : undefined
 
     // For flight search, filter results to those matching any candidate by IATA/ICAO/number+airline where possible
     let results = flights

@@ -1,3 +1,4 @@
+// src/hooks/useRealTimeFlightTracking.ts
 'use client';
 
 import { Flight, FlightPosition } from '@/types/flight';
@@ -35,8 +36,8 @@ interface UseRealTimeFlightTrackingReturn {
 }
 
 const DEFAULT_OPTIONS: Required<UseRealTimeFlightTrackingOptions> = {
-  autoStart: true,
-  updateInterval: 30000, // 30 seconds
+  autoStart: false, // Disabled to prevent conflicts with other tracking
+  updateInterval: 30000, // 30 seconds to reduce API load
   enableNotifications: true,
   onPositionChange: () => {},
   onTrackingStart: () => {},
@@ -251,7 +252,7 @@ export const useRealTimeFlightTracking = (
   // Fallback polling for when WebSocket is not available
   const startPolling = useCallback(() => {
     if (pollingIntervalRef.current) {
-      clearInterval(pollingIntervalRef.current);
+      clearInterval(pollingIntervalRef.current as NodeJS.Timeout);
     }
 
     pollingIntervalRef.current = setInterval(async () => {
@@ -260,9 +261,9 @@ export const useRealTimeFlightTracking = (
       }
 
       try {
-        // Fetch latest flight data
+        // Fetch latest flight data - use the same endpoint as the main page
         if (flight?.flightNumber) {
-          const response = await fetch(`/api/flights?search=${flight.flightNumber}&page=1&pageSize=1`);
+          const response = await fetch(`/api/flights?query=${encodeURIComponent(flight.flightNumber)}&type=flight`);
           if (response.ok) {
             const result = await response.json();
             const updatedFlight = result.flights?.[0];
@@ -270,13 +271,28 @@ export const useRealTimeFlightTracking = (
             if (updatedFlight?.currentPosition) {
               handlePositionUpdate(updatedFlight.currentPosition);
             }
+          } else if (response.status === 429) {
+            // Rate limited - back off exponentially
+            console.log('Rate limited, backing off...');
+            if (pollingIntervalRef.current) {
+              clearInterval(pollingIntervalRef.current as NodeJS.Timeout);
+            }
+            pollingIntervalRef.current = null;
+            
+            // Try again after a longer delay
+            setTimeout(() => {
+              if (isMountedRef.current && trackingState.isActive) {
+                startPolling();
+              }
+            }, opts.updateInterval * 3);
           }
         }
       } catch (error) {
         console.error('Polling failed:', error);
+        // Don't retry immediately on error to avoid spamming
       }
     }, opts.updateInterval);
-  }, [flight?.flightNumber, handlePositionUpdate, opts.updateInterval, trackingState.connectionStatus]);
+  }, [flight?.flightNumber, handlePositionUpdate, opts.updateInterval, trackingState.connectionStatus, trackingState.isActive]);
 
   // Start tracking
   const startTracking = useCallback(() => {
@@ -311,7 +327,7 @@ export const useRealTimeFlightTracking = (
 
       // Clean up polling
       if (pollingIntervalRef.current) {
-        clearInterval(pollingIntervalRef.current);
+        clearInterval(pollingIntervalRef.current as NodeJS.Timeout);
         pollingIntervalRef.current = null;
       }
 

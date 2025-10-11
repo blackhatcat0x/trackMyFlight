@@ -1,3 +1,4 @@
+import "mapbox-gl/dist/mapbox-gl.css";
 import type { Metadata } from "next";
 import { Inter } from "next/font/google";
 import "./globals.css";
@@ -43,6 +44,12 @@ export default function RootLayout({
 }>) {
   return (
     <html lang="en" suppressHydrationWarning>
+      <head>
+        <link 
+          href='https://api.mapbox.com/mapbox-gl-js/v3.0.1/mapbox-gl.css' 
+          rel='stylesheet' 
+        />
+      </head>
       <body
         className={`${inter.variable} font-sans antialiased bg-background text-foreground`}
       >

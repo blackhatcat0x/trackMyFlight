@@ -102,72 +102,128 @@ const transformFlightData = (apiData: any): ExtendedFlight => {
   };
 }
 
+// Global cache to prevent duplicate requests
+const flightCache = new Map<string, { data: ExtendedFlight; timestamp: number }>();
+const pendingRequests = new Map<string, Promise<ExtendedFlight | null>>();
+const CACHE_DURATION = 30000; // 30 seconds
+
 export default function FlightDetailPage({ params }: { params: { id: string } }) {
   const [flight, setFlight] = useState<ExtendedFlight | null>(null)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
   const router = useRouter()
   
-  const isFetchingRef = useRef(false);
-  const hasFetchedRef = useRef(false);
+  const hasMountedRef = useRef(false);
 
   useEffect(() => {
-    if (isFetchingRef.current || hasFetchedRef.current) {
-      console.log('⏭️ Skipping fetch - already done');
+    // Prevent double execution in React StrictMode
+    if (hasMountedRef.current) {
+      console.log('⏭️ Already mounted, skipping');
       return;
     }
+    hasMountedRef.current = true;
 
     const fetchFlightDetails = async () => {
-      console.log('🔄 Fetching flight details...');
-      isFetchingRef.current = true;
-      
-      try {
-        setLoading(true)
-        setError(null)
-        
-        const flightNumber = extractFlightNumber(params.id)
-        console.log('Flight number:', flightNumber)
-        
-        const response = await fetch(`/api/flights?query=${encodeURIComponent(flightNumber)}&type=flight`)
-        
-        if (!response.ok) {
-          if (response.status === 429) {
-            setError('Too many requests. Please wait a moment.')
-            return;
-          }
-          throw new Error(`HTTP ${response.status}`)
-        }
-        
-        const result = await response.json()
-        const flights = result.flights || []
-        
-        if (flights.length === 0) {
-          setError('Flight not found')
-          return
-        }
-        
-        const flightData = flights[0]
-        const transformed = transformFlightData(flightData)
-        
-        if (transformed && transformed.flightNumber) {
-          setFlight(transformed)
-          hasFetchedRef.current = true;
-          console.log('✅ Flight loaded successfully');
-        } else {
-          setError('Invalid flight data')
-        }
-        
-      } catch (err) {
-        console.error('❌ Fetch error:', err)
-        setError(err instanceof Error ? err.message : 'Failed to load flight')
-      } finally {
-        setLoading(false)
-        isFetchingRef.current = false;
-      }
-    }
+      const flightNumber = extractFlightNumber(params.id);
+      const cacheKey = flightNumber;
 
-    fetchFlightDetails()
-  }, [params.id])
+      // Check cache first
+      const cached = flightCache.get(cacheKey);
+      if (cached && Date.now() - cached.timestamp < CACHE_DURATION) {
+        console.log('📦 Using cached flight data');
+        setFlight(cached.data);
+        setLoading(false);
+        return;
+      }
+
+      // Check if request is already in progress
+      if (pendingRequests.has(cacheKey)) {
+        console.log('⏳ Request already in progress, waiting...');
+        try {
+          const result = await pendingRequests.get(cacheKey);
+          if (result) {
+            setFlight(result);
+          } else {
+            setError('Flight not found');
+          }
+        } catch (err) {
+          setError('Failed to load flight');
+        } finally {
+          setLoading(false);
+        }
+        return;
+      }
+
+      console.log('🔄 Fetching flight details...');
+      
+      // Create the request promise
+      const requestPromise = (async (): Promise<ExtendedFlight | null> => {
+        try {
+          setLoading(true);
+          setError(null);
+          
+          const response = await fetch(`/api/flights?query=${encodeURIComponent(flightNumber)}&type=flight`);
+          
+          if (!response.ok) {
+            if (response.status === 429) {
+              throw new Error('Too many requests. Please wait a moment.');
+            }
+            if (response.status === 503) {
+              throw new Error('Service temporarily unavailable. Please try again.');
+            }
+            throw new Error(`HTTP ${response.status}`);
+          }
+          
+          const result = await response.json();
+          const flights = result.flights || [];
+          
+          if (flights.length === 0) {
+            throw new Error('Flight not found');
+          }
+          
+          const flightData = flights[0];
+          const transformed = transformFlightData(flightData);
+          
+          if (!transformed || !transformed.flightNumber) {
+            throw new Error('Invalid flight data');
+          }
+
+          // Cache the result
+          flightCache.set(cacheKey, {
+            data: transformed,
+            timestamp: Date.now()
+          });
+
+          console.log('✅ Flight loaded successfully');
+          return transformed;
+          
+        } catch (err) {
+          console.error('❌ Fetch error:', err);
+          throw err;
+        }
+      })();
+
+      // Store the pending request
+      pendingRequests.set(cacheKey, requestPromise);
+
+      try {
+        const result = await requestPromise;
+        setFlight(result);
+      } catch (err) {
+        setError(err instanceof Error ? err.message : 'Failed to load flight');
+      } finally {
+        setLoading(false);
+        pendingRequests.delete(cacheKey);
+      }
+    };
+
+    fetchFlightDetails();
+
+    // Cleanup on unmount
+    return () => {
+      hasMountedRef.current = false;
+    };
+  }, [params.id]);
 
   const handleBack = () => router.push('/search')
 

@@ -58,9 +58,12 @@ export const FlightTracker: React.FC<FlightTrackerProps> = ({
   const mapContainerRef = useRef<HTMLDivElement>(null);
   const mapRef = useRef<any>(null);
   const markerRef = useRef<any>(null);
+  const planeOverlayRef = useRef<HTMLDivElement>(null);
   const updateIntervalRef = useRef<NodeJS.Timeout | null>(null);
   const animationFrameRef = useRef<number | null>(null);
   const lastKnownPositionRef = useRef<FlightPosition | null>(flight.currentPosition || null);
+  const lastAnimationTimeRef = useRef<number>(Date.now());
+  const isAnimatingRef = useRef<boolean>(false);
 
   // Fetch live position update
   const fetchLivePosition = useCallback(async (): Promise<FlightPosition | null> => {
@@ -140,34 +143,63 @@ export const FlightTracker: React.FC<FlightTrackerProps> = ({
     };
   }, []);
 
-  // Animation loop
+  // Animation loop - continuous smooth movement at 60fps
   const animate = useCallback(() => {
-    if (!lastKnownPositionRef.current || !isTracking || !mapRef.current) return;
+    if (!lastKnownPositionRef.current || !isTracking || !mapRef.current) {
+      if (isTracking) {
+        animationFrameRef.current = requestAnimationFrame(animate);
+      }
+      return;
+    }
 
-    const timeSinceUpdate = Date.now() - lastKnownPositionRef.current.timestamp.getTime();
+    const now = Date.now();
+    lastAnimationTimeRef.current = now;
     
-    if (timeSinceUpdate < UPDATE_INTERVAL * 1.5 && lastKnownPositionRef.current.speed > 50) {
+    // Continue animating as long as we have speed data
+    if (lastKnownPositionRef.current.speed > 10) {
+      // Calculate new interpolated position
       const interpolated = interpolatePosition(lastKnownPositionRef.current);
       setCurrentPosition(interpolated);
       
-      // Center map on aircraft and update marker
-      if (markerRef.current && mapRef.current) {
-        markerRef.current.setLngLat([interpolated.longitude, interpolated.latitude]);
-        mapRef.current.easeTo({
-          center: [interpolated.longitude, interpolated.latitude],
-          duration: 1000
+      // Log to verify we're calculating positions
+      if (now % 5000 < 16) { // Log every ~5 seconds
+        console.log('🎬 Animating:', {
+          lat: interpolated.latitude.toFixed(4),
+          lon: interpolated.longitude.toFixed(4),
+          heading: Math.round(interpolated.heading)
         });
-        
-        const markerEl = markerRef.current.getElement();
-        const aircraftIcon = markerEl?.querySelector('.aircraft-marker');
-        if (aircraftIcon) {
-          (aircraftIcon as HTMLElement).style.transform = `rotate(${interpolated.heading}deg)`;
-        }
       }
       
+      // CRITICAL: Move the map to keep the plane centered
+      // The plane overlay stays fixed, the map moves underneath
+      try {
+        const currentCenter = mapRef.current.getCenter();
+        const newCenter = [interpolated.longitude, interpolated.latitude];
+        
+        // Only update if position changed significantly (avoid micro-movements)
+        const dist = Math.sqrt(
+          Math.pow(currentCenter.lng - newCenter[0], 2) + 
+          Math.pow(currentCenter.lat - newCenter[1], 2)
+        );
+        
+        if (dist > 0.00001) { // Minimum distance threshold
+          mapRef.current.setCenter(newCenter);
+        }
+      } catch (error) {
+        console.error('Map update error:', error);
+      }
+      
+      // Update plane overlay rotation
+      if (planeOverlayRef.current) {
+        const rotation = interpolated.heading;
+        planeOverlayRef.current.style.transform = `translate(-50%, -50%) rotate(${rotation}deg)`;
+      }
+      
+      // Update the route line (if visible)
       updateRouteLine(interpolated);
     }
 
+    // Continue animation loop
     if (isTracking) {
       animationFrameRef.current = requestAnimationFrame(animate);
     }
@@ -199,9 +231,10 @@ export const FlightTracker: React.FC<FlightTrackerProps> = ({
           container: mapContainerRef.current!,
           style: 'mapbox://styles/mapbox/streets-v12', // Colored map style
           center: initialPos ? [initialPos.longitude, initialPos.latitude] : [0, 0],
-          zoom: initialPos ? 8 : 2,
+          zoom: initialPos ? 9 : 2, // Default zoom level
           pitch: 0,
           bearing: 0,
+          interactive: true, // Allow user to zoom/pan
         });
 
         map.on('load', () => {
@@ -219,8 +252,8 @@ export const FlightTracker: React.FC<FlightTrackerProps> = ({
           console.log('📍 Navigation controls added');
 
           if (initialPos) {
-            console.log('✈️ Adding aircraft marker at:', initialPos);
-            addAircraftMarker(map, initialPos);
+            console.log('✈️ Initial position:', initialPos);
+            // Don't add a marker - we'll use a fixed overlay instead
             addRouteLayer(map, initialPos);
           } else {
             console.warn('⚠️ No initial position available');
@@ -248,7 +281,7 @@ export const FlightTracker: React.FC<FlightTrackerProps> = ({
     };
   }, [MAPBOX_TOKEN]);
 
-  // Add aircraft marker with airplane SVG
+  // Add aircraft marker with airplane PNG
   const addAircraftMarker = async (map: any, position: FlightPosition) => {
     if (!map) {
       console.error('❌ Map not available');
@@ -268,53 +301,36 @@ export const FlightTracker: React.FC<FlightTrackerProps> = ({
       const el = document.createElement('div');
       el.className = 'aircraft-marker-container';
       el.style.cssText = `
-        width: 50px;
-        height: 50px;
+        width: 60px;
+        height: 60px;
         cursor: pointer;
         display: flex;
         align-items: center;
         justify-content: center;
+        pointer-events: none;
+        position: absolute;
+        left: 50%;
+        top: 50%;
+        transform: translate(-50%, -50%);
+        z-index: 1000;
       `;
       
       el.innerHTML = `
         <div class="aircraft-marker" style="
-          width: 50px;
-          height: 50px;
+          width: 60px;
+          height: 60px;
           display: flex;
           align-items: center;
           justify-content: center;
           transform: rotate(${position.heading}deg);
-          transition: transform 0.5s linear;
+          transition: transform 0.5s ease-out;
         ">
-          <svg width="50" height="50" viewBox="0 0 512 512" xmlns="http://www.w3.org/2000/svg">
-            <g transform="translate(256,256)">
-              <!-- Airplane body -->
-              <path d="M 0,-200 L -30,-50 L -50,50 L -30,100 L 0,120 L 30,100 L 50,50 L 30,-50 Z" 
-                    fill="#1E40AF" 
-                    stroke="#FFFFFF" 
-                    stroke-width="8"/>
-              <!-- Wings -->
-              <path d="M -30,-50 L -150,-20 L -150,20 L -30,0 Z" 
-                    fill="#3B82F6" 
-                    stroke="#FFFFFF" 
-                    stroke-width="6"/>
-              <path d="M 30,-50 L 150,-20 L 150,20 L 30,0 Z" 
-                    fill="#3B82F6" 
-                    stroke="#FFFFFF" 
-                    stroke-width="6"/>
-              <!-- Tail wings -->
-              <path d="M -20,70 L -60,100 L -40,110 L -20,90 Z" 
-                    fill="#3B82F6" 
-                    stroke="#FFFFFF" 
-                    stroke-width="4"/>
-              <path d="M 20,70 L 60,100 L 40,110 L 20,90 Z" 
-                    fill="#3B82F6" 
-                    stroke="#FFFFFF" 
-                    stroke-width="4"/>
-              <!-- Cockpit -->
-              <circle cx="0" cy="-150" r="15" fill="#FFFFFF" opacity="0.9"/>
-            </g>
-          </svg>
+          <img src="/img/plane-map.png" alt="Aircraft" style="
+            width: 100%;
+            height: 100%;
+            object-fit: contain;
+            filter: drop-shadow(0 2px 4px rgba(0,0,0,0.3));
+          " />
         </div>
       `;
 
@@ -399,26 +415,43 @@ export const FlightTracker: React.FC<FlightTrackerProps> = ({
 
   // Setup periodic updates
   useEffect(() => {
-    if (!isTracking) return;
+    if (!isTracking) {
+      // Stop animation when paused
+      if (animationFrameRef.current) {
+        cancelAnimationFrame(animationFrameRef.current);
+        animationFrameRef.current = null;
+      }
+      isAnimatingRef.current = false;
+      return;
+    }
 
     const updatePosition = async () => {
       const newPosition = await fetchLivePosition();
       if (newPosition) {
+        console.log('🎯 Got real position update from API');
+        console.log('Current heading from API:', newPosition.heading);
+        
+        // Update our reference position
         lastKnownPositionRef.current = newPosition;
         setCurrentPosition(newPosition);
         setLastUpdateTime(new Date());
+        lastAnimationTimeRef.current = Date.now();
         
+                  // Update marker with new real position
         if (markerRef.current && mapRef.current) {
           markerRef.current.setLngLat([newPosition.longitude, newPosition.latitude]);
-          mapRef.current.easeTo({
-            center: [newPosition.longitude, newPosition.latitude],
-            duration: 1000
+          
+          // Center map immediately on the new position
+          mapRef.current.jumpTo({
+            center: [newPosition.longitude, newPosition.latitude]
           });
           
+          // Update airplane rotation
           const markerEl = markerRef.current.getElement();
           const aircraftIcon = markerEl?.querySelector('.aircraft-marker');
           if (aircraftIcon) {
-            (aircraftIcon as HTMLElement).style.transform = `rotate(${newPosition.heading}deg)`;
+            const rotation = newPosition.heading; // Assuming plane points north in PNG
+            (aircraftIcon as HTMLElement).style.transform = `rotate(${rotation}deg)`;
           }
         }
         
@@ -426,13 +459,34 @@ export const FlightTracker: React.FC<FlightTrackerProps> = ({
       }
     };
 
-    updatePosition();
+    // Initial update
+    if (!isAnimatingRef.current) {
+      updatePosition();
+    }
+    
+    // Set up periodic API updates every 60 seconds
+    if (updateIntervalRef.current) {
+      clearInterval(updateIntervalRef.current);
+    }
     updateIntervalRef.current = setInterval(updatePosition, UPDATE_INTERVAL);
-    animationFrameRef.current = requestAnimationFrame(animate);
+    
+    // Start continuous animation loop if not already running
+    if (!isAnimatingRef.current && !animationFrameRef.current) {
+      isAnimatingRef.current = true;
+      lastAnimationTimeRef.current = Date.now();
+      animationFrameRef.current = requestAnimationFrame(animate);
+    }
 
     return () => {
-      if (updateIntervalRef.current) clearInterval(updateIntervalRef.current);
-      if (animationFrameRef.current) cancelAnimationFrame(animationFrameRef.current);
+      if (updateIntervalRef.current) {
+        clearInterval(updateIntervalRef.current);
+        updateIntervalRef.current = null;
+      }
+      if (animationFrameRef.current) {
+        cancelAnimationFrame(animationFrameRef.current);
+        animationFrameRef.current = null;
+      }
+      isAnimatingRef.current = false;
     };
   }, [isTracking, fetchLivePosition, animate]);
 
@@ -495,6 +549,33 @@ export const FlightTracker: React.FC<FlightTrackerProps> = ({
         className="absolute inset-0"
         style={{ width: '100%', height: '100%' }}
       />
+      
+      {/* Fixed airplane overlay - stays centered, map moves underneath */}
+      <div
+        ref={planeOverlayRef}
+        className="absolute"
+        style={{
+          left: '50%',
+          top: '50%',
+          transform: 'translate(-50%, -50%)',
+          width: '60px',
+          height: '60px',
+          zIndex: 1000,
+          pointerEvents: 'none',
+          transition: 'transform 0.5s ease-out',
+        }}
+      >
+        <img 
+          src="/img/plane-map.png" 
+          alt="Aircraft" 
+          style={{
+            width: '100%',
+            height: '100%',
+            objectFit: 'contain',
+            filter: 'drop-shadow(0 4px 6px rgba(0,0,0,0.4))',
+          }}
+        />
+      </div>
       
       {!mapLoaded && (
         <div className="absolute inset-0 flex items-center justify-center bg-gray-100">

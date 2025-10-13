@@ -1,0 +1,131 @@
+{
+  "EZY49LE": {
+    "data": {
+      "flightNumber": "EZY49LE",
+      "date": "13 Oct 2025",
+      "airline": {
+        "code": "EZY",
+        "name": "easyJet"
+      },
+      "origin": {
+        "code": "BRS",
+        "airport": "Bristol Airport",
+        "city": "Bristol",
+        "country": "GB",
+        "flag": "🇬🇧",
+        "latitude": 51.382702,
+        "longitude": -2.71909
+      },
+      "destination": {
+        "code": "NCE",
+        "airport": "Nice-Côte d'Azur Airport",
+        "city": "Nice, Alpes-Maritimes",
+        "country": "FR",
+        "flag": "🇫🇷",
+        "latitude": 43.658401,
+        "longitude": 7.21587
+      },
+      "departure": {
+        "time": "11:25",
+        "timezone": "BST"
+      },
+      "arrival": {
+        "time": "13:17",
+        "timezone": "CEST"
+      },
+      "aircraft": {
+        "model": "A20N",
+        "registration": "G-UZHJ"
+      },
+      "status": "unknown",
+      "scrapedAt": "2025-10-13T11:27:31.193Z"
+    },
+    "timestamp": 1760354851195
+  },
+  "U22767": {
+    "data": {
+      "flightNumber": "U22767",
+      "date": "13 Oct 2025",
+      "airline": {
+        "code": "UNK",
+        "name": "Unknown Airline"
+      },
+      "origin": {
+        "code": "BRS",
+        "airport": "Bristol Airport",
+        "city": "Bristol",
+        "country": "GB",
+        "flag": "🇬🇧",
+        "latitude": 51.382702,
+        "longitude": -2.71909
+      },
+      "destination": {
+        "code": "NCE",
+        "airport": "Nice-Côte d'Azur Airport",
+        "city": "Nice, Alpes-Maritimes",
+        "country": "FR",
+        "flag": "🇫🇷",
+        "latitude": 43.658401,
+        "longitude": 7.21587
+      },
+      "departure": {
+        "time": "11:09",
+        "timezone": "BST"
+      },
+      "arrival": {
+        "time": "14:06",
+        "timezone": "CEST"
+      },
+      "aircraft": {
+        "model": "A20N",
+        "registration": "G-UZHJ"
+      },
+      "status": "unknown",
+      "scrapedAt": "2025-10-13T11:27:41.619Z"
+    },
+    "timestamp": 1760354861620
+  },
+  "EZY81KF": {
+    "data": {
+      "flightNumber": "EZY81KF",
+      "date": "13 Oct 2025",
+      "airline": {
+        "code": "EZY",
+        "name": "easyJet"
+      },
+      "origin": {
+        "code": "ATH",
+        "airport": "Athens Eleftherios Venizelos International Airport",
+        "city": "Spata-Artemida",
+        "country": "GR",
+        "flag": "🇬🇷",
+        "latitude": 37.936401,
+        "longitude": 23.9445
+      },
+      "destination": {
+        "code": "MAN",
+        "airport": "Manchester Airport",
+        "city": "Manchester, Greater Manchester",
+        "country": "GB",
+        "flag": "🇬🇧",
+        "latitude": 53.349375,
+        "longitude": -2.279521
+      },
+      "departure": {
+        "time": "13:28",
+        "timezone": "EEST"
+      },
+      "arrival": {
+        "time": "15:19",
+        "timezone": "BST"
+      },
+      "aircraft": {
+        "model": "A320",
+        "registration": "G-EZTA"
+      },
+      "status": "unknown",
+      "scrapedAt": "2025-10-13T11:54:10.517Z"
+    },
+    "timestamp": 1760356450519
+  }
+}

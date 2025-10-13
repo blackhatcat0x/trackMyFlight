@@ -5,7 +5,7 @@ A comprehensive React Native flight tracking application built with Expo and Typ
 ## Features
 
 - **Real-time Flight Tracking**: Track flights worldwide with live position updates
-- **Multi-source API Architecture**: Integrates AviationStack, ADSB Exchange, and OpenSky Network
+- **Multi-source API Architecture**: Integrates AviationStack and ADSB Exchange with PlaneFinder enhancement
 - **Search Functionality**: Search flights by number, route, or airport
 - **Flight Details**: Comprehensive flight information including aircraft, status, and timing
 - **Responsive Design**: Optimized for mobile devices with React Native
@@ -41,6 +41,11 @@ A comprehensive React Native flight tracking application built with Expo and Typ
 - Register at [adsbexchange.com](https://www.adsbexchange.com/)
 - API key required for enhanced features
 - Add to .env file
+
+### Airplanes.live API
+- Free API access for real-time flight tracking
+- No API key required
+- Used as primary source for live flight data
 
 ## Available Scripts
 - \`npm start\` - Start Expo development server

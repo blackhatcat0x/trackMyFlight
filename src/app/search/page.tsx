@@ -1,3 +1,4 @@
+//file: src/app/search/page.tsx
 'use client'
 
 import Image from 'next/image'
@@ -5,7 +6,7 @@ import { useRouter } from 'next/navigation'
 import { useMemo, useState } from 'react'
 
 type Live = {
-  source?: 'airplanes.live' | 'adsbx' | 'opensky' | null
+  source?: 'airplanes.live' | 'adsbx' | null
   callsign?: string | null
   lat?: number | null
   lon?: number | null
@@ -25,6 +26,7 @@ type Flight = {
     name: string | null
     city: string | null
     country: string | null
+    countryCode?: string | null
     latitude?: number | null
     longitude?: number | null
     timezone?: string | null
@@ -32,12 +34,14 @@ type Flight = {
     actualTime?: string | null
     terminal?: string | null
     gate?: string | null
+    flag?: string | null
   }
   destination: {
     code: string | null
     name: string | null
     city: string | null
     country: string | null
+    countryCode?: string | null
     latitude?: number | null
     longitude?: number | null
     timezone?: string | null
@@ -46,10 +50,21 @@ type Flight = {
     terminal?: string | null
     gate?: string | null
     baggage?: string | null
+    flag?: string | null
   }
   status: 'scheduled' | 'departed' | 'arrived' | 'delayed' | 'cancelled' | 'diverted' | 'unknown'
   aircraft?: { registration?: string | null; model?: string | null; icao24?: string | null } | null
   live?: Live | null
+  enrichedTiming?: {
+    departure: { time: string; timezone: string }
+    arrival: { time: string; timezone: string }
+  }
+  sources?: {
+    planefinder?: {
+      scrapedAt: string
+      status: string
+    }
+  }
   raw?: any
 }
 
@@ -119,6 +134,18 @@ export default function SearchPage() {
 
       if (response.ok) {
         const flights: Flight[] = Array.isArray(result?.flights) ? result.flights : []
+        
+        // Debug logging
+        if (flights.length > 0) {
+          console.log('=== Flight Data Debug ===')
+          console.log('Origin flag:', flights[0]?.origin?.flag)
+          console.log('Origin flag type:', typeof flights[0]?.origin?.flag)
+          console.log('Destination flag:', flights[0]?.destination?.flag)
+          console.log('Destination flag type:', typeof flights[0]?.destination?.flag)
+          console.log('Full origin:', flights[0]?.origin)
+          console.log('Full destination:', flights[0]?.destination)
+        }
+        
         setSearchResults(flights)
 
         if (flights.length === 0) {
@@ -181,7 +208,6 @@ export default function SearchPage() {
     const map: Record<NonNullable<Live['source']>, string> = {
       'airplanes.live': 'bg-purple-500/30 text-purple-200',
       adsbx: 'bg-emerald-500/30 text-emerald-200',
-      opensky: 'bg-cyan-500/30 text-cyan-200',
     }
     const cls = map[src] || 'bg-gray-500/30 text-gray-200'
     return <span className={`ml-2 inline-block px-2 py-0.5 rounded-full text-[10px] ${cls}`}>{src}</span>
@@ -526,6 +552,16 @@ export default function SearchPage() {
                           </span>
                         )}
                       </h3>
+
+                      {/* Debug flag rendering */}
+{searchResults.length > 0 && (
+  <div className="mb-4 p-4 bg-yellow-500/20 rounded">
+    <p>Flag test: {searchResults[0].origin.flag} {searchResults[0].destination.flag}</p>
+    <p>Raw: origin={JSON.stringify(searchResults[0].origin.flag)} dest={JSON.stringify(searchResults[0].destination.flag)}</p>
+  </div>
+)}
+
+
                       <div className="space-y-3">
                         {searchResults.map((flight) => (
                           <div
@@ -549,16 +585,22 @@ export default function SearchPage() {
                               </div>
                               <div className="text-right">
                                 <div className="flex items-center gap-2 text-white justify-end">
-                                  <div className="text-center min-w-[64px]">
-                                    <div className="font-medium">{flight.origin.code || '-'}</div>
-                                    <div className="text-xs text-blue-200 truncate max-w-[120px]">
+                                  <div className="text-center min-w-[80px]">
+                                    <div className="flex items-center justify-center gap-1">
+                                     {flight.origin.flag && <span className="text-lg">{flight.origin.flag}</span>}
+                                      <div className="font-medium">{flight.origin.code || '-'}</div>
+                                    </div>
+                                    <div className="text-xs text-blue-200 truncate max-w-[100px]">
                                       {flight.origin.city || ''}
                                     </div>
                                   </div>
                                   <div className="text-blue-400">→</div>
-                                  <div className="text-center min-w-[64px]">
-                                    <div className="font-medium">{flight.destination.code || '-'}</div>
-                                    <div className="text-xs text-blue-200 truncate max-w-[120px]">
+                                  <div className="text-center min-w-[80px]">
+                                    <div className="flex items-center justify-center gap-1">
+                                      {flight.destination.flag && <span className="text-lg">{flight.destination.flag}</span>}
+                                      <div className="font-medium">{flight.destination.code || '-'}</div>
+                                    </div>
+                                    <div className="text-xs text-blue-200 truncate max-w-[100px]">
                                       {flight.destination.city || ''}
                                     </div>
                                   </div>
@@ -570,6 +612,39 @@ export default function SearchPage() {
                                 </div>
                               </div>
                             </div>
+
+                            {flight.enrichedTiming && (
+                              <div className="mt-3 pt-3 border-t border-white/10">
+                                <div className="flex items-center gap-4 text-sm text-blue-200">
+                                  <div className="flex items-center gap-2">
+                                    <svg className="w-4 h-4 text-blue-300" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
+                                    </svg>
+                                    <span>Departure: {flight.enrichedTiming.departure.time} {flight.enrichedTiming.departure.timezone}</span>
+                                  </div>
+                                  <div className="flex items-center gap-2">
+                                    <svg className="w-4 h-4 text-green-300" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 8l4 4m0 0l-4 4m4-4H3" />
+                                    </svg>
+                                    <span>Arrival: {flight.enrichedTiming.arrival.time} {flight.enrichedTiming.arrival.timezone}</span>
+                                  </div>
+                                </div>
+                              </div>
+                            )}
+
+                            {flight.aircraft && (flight.aircraft.model || flight.aircraft.registration) && (
+                              <div className="mt-2 pb-3 border-t border-white/10">
+                                <div className="flex items-center gap-4 text-sm text-blue-200">
+                                  <svg className="w-4 h-4 text-blue-300" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 21v-4m0 0l2-2m0 0l7-7m7 7l-7-7m0 0l2-2m-2 2h8M3 17V7a2 2 0 012-2h8a2 2 0 012 2v10M3 7a2 2 0 012-2h8a2 2 0 012 2M9 3a1 1 0 011-1h4a1 1 0 011 1H8z" />
+                                  </svg>
+                                  <div>
+                                    {flight.aircraft.model && <span className="mr-3">{flight.aircraft.model}</span>}
+                                    {flight.aircraft.registration && <span className="text-blue-300">({flight.aircraft.registration})</span>}
+                                  </div>
+                                </div>
+                              </div>
+                            )}
 
                             {flight.live && liveLine(flight.live) && (
                               <div className="mt-3 pt-3 border-t border-white/10">

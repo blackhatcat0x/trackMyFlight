@@ -4,7 +4,6 @@ import axios, { AxiosError, AxiosInstance } from 'axios';
 class FlightService {
   private aviationStackClient: AxiosInstance;
   private adsbClient: AxiosInstance;
-  private openSkyClient: AxiosInstance;
   
   constructor() {
     // Aviation Stack API Client
@@ -23,12 +22,6 @@ class FlightService {
       headers: {
         'api-auth': process.env.EXPO_PUBLIC_ADSB_API_KEY
       }
-    });
-
-    // OpenSky Network API Client
-    this.openSkyClient = axios.create({
-      baseURL: 'https://opensky-network.org/api',
-      timeout: 12000
     });
 
     this.setupInterceptors();
@@ -61,13 +54,12 @@ class FlightService {
 
     setupClient(this.aviationStackClient, 'AviationStack');
     setupClient(this.adsbClient, 'ADSB');
-    setupClient(this.openSkyClient, 'OpenSky');
   }
 
   private handleError(error: AxiosError, serviceName: string): Error {
     if (error.response) {
       const status = error.response.status;
-      const message = error.response.data?.message || 'Unknown error';
+      const message = (error.response.data as any)?.message || 'Unknown error';
       
       switch (status) {
         case 401:
@@ -100,8 +92,8 @@ class FlightService {
         return adsbResult;
       }
 
-      // Final fallback to OpenSky
-      return await this.searchOpenSky(query, filters);
+      // No results found
+      return { flights: [], total: 0, hasMore: false, page: 1 };
     } catch (error) {
       console.error('All flight search services failed:', error);
       throw new Error('Unable to search flights at this time. Please try again later.');
@@ -163,29 +155,6 @@ class FlightService {
     }
   }
 
-  private async searchOpenSky(query: string, filters?: SearchFilters): Promise<FlightSearchResult> {
-    try {
-      const response = await this.openSkyClient.get('/states/all');
-      
-      const states = response.data.states || [];
-      const flights = states
-        .filter((state: any[]) => {
-          const callsign = state[1];
-          return callsign && callsign.toLowerCase().includes(query.toLowerCase());
-        })
-        .map(this.transformOpenSkyFlight);
-
-      return {
-        flights,
-        total: flights.length,
-        hasMore: false,
-        page: 1
-      };
-    } catch (error) {
-      console.error('OpenSky search failed:', error);
-      return { flights: [], total: 0, hasMore: false, page: 1 };
-    }
-  }
 
   async getFlightDetails(flightId: string): Promise<Flight | null> {
     try {
@@ -229,23 +198,6 @@ class FlightService {
     }
   }
 
-  async getFlightsByRegion(bounds: { north: number; south: number; east: number; west: number }): Promise<Flight[]> {
-    try {
-      const response = await this.openSkyClient.get('/states/all', {
-        params: {
-          lamin: bounds.south,
-          lamax: bounds.north,
-          lomin: bounds.west,
-          lomax: bounds.east
-        }
-      });
-
-      return response.data.states?.map(this.transformOpenSkyFlight) || [];
-    } catch (error) {
-      console.error('Failed to get flights by region:', error);
-      return [];
-    }
-  }
 
   async searchAirports(query: string): Promise<Airport[]> {
     try {
@@ -331,39 +283,6 @@ class FlightService {
     };
   }
 
-  private transformOpenSkyFlight(state: any[]): Flight {
-    const [
-      icao24, callsign, originCountry, timePosition, lastContact, 
-      longitude, latitude, geoAltitude, onGround, velocity, 
-      heading, verticalRate, sensors, baroAltitude, squawk, 
-      spi, positionSource
-    ] = state;
-
-    return {
-      id: icao24,
-      callsign: callsign || 'UNKNOWN',
-      aircraft: {
-        registration: 'UNKNOWN',
-        model: 'Unknown',
-        icao24: icao24
-      },
-      origin: { id: '', name: '', city: '', country: '', iata: '', icao: '', position: { latitude: 0, longitude: 0, elevation: 0 }, timezone: '' },
-      destination: { id: '', name: '', city: '', country: '', iata: '', icao: '', position: { latitude: 0, longitude: 0, elevation: 0 }, timezone: '' },
-      departure: { scheduled: '' },
-      arrival: { scheduled: '' },
-      status: FlightStatus.IN_FLIGHT,
-      position: {
-        latitude: latitude || 0,
-        longitude: longitude || 0,
-        altitude: baroAltitude || 0,
-        heading: heading || 0,
-        speed: velocity || 0,
-        timestamp: new Date().toISOString()
-      },
-      route: { distance: 0, estimatedDuration: 0 },
-      airline: { name: originCountry || 'Unknown', icao: 'UNKNOWN', iata: 'UNKNOWN' }
-    };
-  }
 
   private transformAviationStackAirport(data: any): Airport {
     return {

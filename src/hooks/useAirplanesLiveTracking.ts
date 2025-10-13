@@ -191,16 +191,6 @@ export const useAirplanesLiveTracking = (
         console.log(`ADS-B Exchange failed:`, error instanceof Error ? error.message : error);
       }
 
-      // Try OpenSky
-      try {
-        const position = await fetchFromOpenSky(callsign);
-        if (position) {
-          consecutiveErrorsRef.current = 0; // Reset error count on success
-          return position;
-        }
-      } catch (error) {
-        console.log(`OpenSky failed:`, error instanceof Error ? error.message : error);
-      }
 
       console.log(`No live data found for ${callsign} from any source`);
       consecutiveErrorsRef.current++;
@@ -309,58 +299,6 @@ export const useAirplanesLiveTracking = (
     }
   }, []);
 
-  // Fetch from OpenSky directly
-  const fetchFromOpenSky = useCallback(async (callsign: string): Promise<FlightPosition | null> => {
-    console.log(`Trying OpenSky for ${callsign}...`);
-
-    try {
-      const response = await fetch(`https://opensky-network.org/api/states/all?callsign=${encodeURIComponent(callsign)}`, {
-        signal: abortControllerRef.current?.signal,
-        headers: {
-          'User-Agent': 'TrackMyFlight-App/1.0',
-          'Accept': 'application/json',
-        },
-      });
-
-      if (!response.ok) {
-        throw new Error(`OpenSky error: ${response.status}`);
-      }
-
-      const data = await response.json();
-      const states = Array.isArray(data.states) ? data.states : [];
-      
-      if (states.length > 0) {
-        const state = states[0];
-        
-        if (state[5] && state[6]) { // longitude and latitude
-          const position: FlightPosition = {
-            latitude: state[6],
-            longitude: state[5],
-            altitude: state[7] || 0,
-            speed: state[9] ? state[9] * 1.94384 : 0, // m/s to knots
-            heading: state[10] || 0,
-            timestamp: new Date(),
-          };
-          
-          console.log(`✓ Received live position from OpenSky for ${callsign}:`, {
-            lat: position.latitude,
-            lon: position.longitude,
-            alt: position.altitude,
-            speed: position.speed,
-            heading: position.heading,
-          });
-          
-          return position;
-        }
-      }
-
-      console.log(`No position data from OpenSky for ${callsign}`);
-      return null;
-    } catch (error) {
-      console.log(`✗ OpenSky failed for ${callsign}:`, error instanceof Error ? error.message : error);
-      return null;
-    }
-  }, []);
 
   // Interpolate position between two points
   const interpolatePosition = useCallback((from: FlightPosition, to: FlightPosition, progress: number): FlightPosition => {

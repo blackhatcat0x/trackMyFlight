@@ -44,6 +44,8 @@ export const FlightTracker: React.FC<FlightTrackerProps> = ({
     console.log('🛫 FlightTracker initialized');
     console.log('Flight:', flight.flightNumber);
     console.log('Has current position:', !!flight.currentPosition);
+    console.log('Origin:', flight.origin.code, `(${flight.origin.latitude}, ${flight.origin.longitude})`);
+    console.log('Destination:', flight.destination.code, `(${flight.destination.latitude}, ${flight.destination.longitude})`);
     if (flight.currentPosition) {
       console.log('Initial position:', flight.currentPosition);
     }
@@ -355,6 +357,18 @@ export const FlightTracker: React.FC<FlightTrackerProps> = ({
   const addRouteLayer = (map: any, position: FlightPosition) => {
     if (!map || !showRouteState) return;
 
+    // Check if we have valid origin/destination data
+    const hasValidRoute = 
+      flight.origin.latitude !== 0 && 
+      flight.origin.longitude !== 0 &&
+      flight.destination.latitude !== 0 && 
+      flight.destination.longitude !== 0;
+
+    if (!hasValidRoute) {
+      console.log('⚠️ No valid route data (live-only flight), skipping route line');
+      return;
+    }
+
     const routeCoordinates = [
       [flight.origin.longitude, flight.origin.latitude],
       [position.longitude, position.latitude],
@@ -395,6 +409,15 @@ export const FlightTracker: React.FC<FlightTrackerProps> = ({
   const updateRouteLine = (position: FlightPosition) => {
     const map = mapRef.current;
     if (!map || !showRouteState) return;
+
+    // Check if we have valid route data
+    const hasValidRoute = 
+      flight.origin.latitude !== 0 && 
+      flight.origin.longitude !== 0 &&
+      flight.destination.latitude !== 0 && 
+      flight.destination.longitude !== 0;
+
+    if (!hasValidRoute) return;
 
     const routeCoordinates = [
       [flight.origin.longitude, flight.origin.latitude],

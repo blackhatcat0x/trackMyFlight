@@ -331,7 +331,7 @@ export default function FlightDetailPage({ params }: { params: { id: string } })
             </div>
           )}
 
-          <div className="bg-white/10 backdrop-blur-md rounded-2xl shadow-2xl p-8 border border-white/20 mb-6">
+          <div className="bg-white/10 backdrop-blur-md rounded-2xl shadow-2xl p-8 border border-white/20 mb-6 flight-data">
             <div className="flex items-center justify-between mb-6">
               <div className="flex items-center gap-4">
                 <div className="text-4xl">✈️</div>

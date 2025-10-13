@@ -124,8 +124,94 @@
         "registration": "G-EZTA"
       },
       "status": "unknown",
-      "scrapedAt": "2025-10-13T11:54:10.517Z"
+      "scrapedAt": "2025-10-13T12:25:50.515Z"
     },
-    "timestamp": 1760356450519
+    "timestamp": 1760358350516
+  },
+  "EJU89RT": {
+    "data": {
+      "flightNumber": "EJU89RT",
+      "date": "13 Oct 2025",
+      "airline": {
+        "code": "EJU",
+        "name": "Unknown Airline"
+      },
+      "origin": {
+        "code": "GVA",
+        "airport": "Geneva Cointrin International Airport",
+        "city": "Geneva",
+        "country": "CH",
+        "flag": "🇨🇭",
+        "latitude": 46.238098,
+        "longitude": 6.10895
+      },
+      "destination": {
+        "code": "MAD",
+        "airport": "Adolfo Suárez Madrid–Barajas Airport",
+        "city": "Madrid",
+        "country": "ES",
+        "flag": "🇪🇸",
+        "latitude": 40.471926,
+        "longitude": -3.56264
+      },
+      "departure": {
+        "time": "14:05",
+        "timezone": "CEST"
+      },
+      "arrival": {
+        "time": "14:29",
+        "timezone": "CEST"
+      },
+      "aircraft": {
+        "model": "A20N",
+        "registration": "HB-AYN"
+      },
+      "status": "unknown",
+      "scrapedAt": "2025-10-13T12:29:28.571Z"
+    },
+    "timestamp": 1760358568572
+  },
+  "EJU82BU": {
+    "data": {
+      "flightNumber": "EJU82BU",
+      "date": "13 Oct 2025",
+      "airline": {
+        "code": "EJU",
+        "name": "Unknown Airline"
+      },
+      "origin": {
+        "code": "NAP",
+        "airport": "Naples International Airport",
+        "city": "Napoli",
+        "country": "IT",
+        "flag": "🇮🇹",
+        "latitude": 40.886002,
+        "longitude": 14.2908
+      },
+      "destination": {
+        "code": "PRG",
+        "airport": "Václav Havel Airport Prague",
+        "city": "Prague",
+        "country": "CZ",
+        "flag": "🇨🇿",
+        "latitude": 50.100874,
+        "longitude": 14.259911
+      },
+      "departure": {
+        "time": "13:55",
+        "timezone": "CEST"
+      },
+      "arrival": {
+        "time": "14:40",
+        "timezone": "CEST"
+      },
+      "aircraft": {
+        "model": "A320",
+        "registration": "OE-IJX"
+      },
+      "status": "unknown",
+      "scrapedAt": "2025-10-13T12:40:36.165Z"
+    },
+    "timestamp": 1760359236166
   }
 }

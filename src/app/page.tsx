@@ -2,10 +2,8 @@
 
 import Image from 'next/image'
 import { useRouter } from 'next/navigation'
-import { useState } from 'react'
 
 export default function Home() {
-  const [showLearnMore, setShowLearnMore] = useState(false)
   const router = useRouter()
 
   const handleGetStarted = () => {
@@ -14,7 +12,7 @@ export default function Home() {
   }
 
   const handleLearnMore = () => {
-    setShowLearnMore(!showLearnMore)
+    router.push('/learn-more')
   }
 
   return (
@@ -87,37 +85,6 @@ export default function Home() {
           </button>
         </div>
 
-        {/* Learn More Section */}
-        {showLearnMore && (
-          <div className="bg-white/10 backdrop-blur-md rounded-2xl shadow-2xl p-8 max-w-2xl w-full border border-white/20 animate-in slide-in-from-bottom-5 duration-300">
-            <h3 className="text-2xl font-bold mb-4 text-white">About TrackMyFlight</h3>
-            <div className="space-y-4 text-blue-100">
-              <p>
-                TrackMyFlight is your comprehensive solution for real-time flight tracking. Whether you're a frequent traveler, 
-                aviation enthusiast, or need to monitor flights for business, our platform provides accurate, up-to-the-minute 
-                information about flights worldwide.
-              </p>
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mt-6">
-                <div className="bg-white/10 rounded-lg p-4 border border-white/10">
-                  <h4 className="font-semibold text-white mb-2">🌍 Global Coverage</h4>
-                  <p className="text-sm">Track flights across all continents and major airports</p>
-                </div>
-                <div className="bg-white/10 rounded-lg p-4 border border-white/10">
-                  <h4 className="font-semibold text-white mb-2">📱 Responsive Design</h4>
-                  <p className="text-sm">Works seamlessly on desktop, tablet, and mobile devices</p>
-                </div>
-                <div className="bg-white/10 rounded-lg p-4 border border-white/10">
-                  <h4 className="font-semibold text-white mb-2">⚡ Real-time Updates</h4>
-                  <p className="text-sm">Get instant notifications about flight status changes</p>
-                </div>
-                <div className="bg-white/10 rounded-lg p-4 border border-white/10">
-                  <h4 className="font-semibold text-white mb-2">🔍 Advanced Search</h4>
-                  <p className="text-sm">Find flights by number, route, or airport</p>
-                </div>
-              </div>
-            </div>
-          </div>
-        )}
       </div>
     </div>
   )

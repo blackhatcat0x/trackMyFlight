@@ -766,43 +766,69 @@ export default function FlightDetailPage({ params }: { params: { id: string } })
             <div className="bg-white/10 backdrop-blur-md rounded-2xl shadow-2xl p-6 border border-white/20 mb-6">
               <h3 className="text-xl font-bold text-white mb-4">Aircraft Information</h3>
               
-              {/* Aircraft Photo */}
+              {/* Aircraft Photo with side-by-side layout */}
               {aircraftPhoto && (
                 <div className="mb-6 rounded-lg overflow-hidden border border-white/20">
-                  <img 
-                    src={aircraftPhoto.thumbnailUrl || aircraftPhoto.imageUrl} 
-                    alt={`${flight.aircraft.registration} - ${flight.aircraft.model}`}
-                    className="w-full h-64 object-cover"
-                    onError={(e) => {
-                      (e.target as HTMLImageElement).style.display = 'none';
-                    }}
-                  />
-                  <div className="bg-white/5 p-3 text-xs text-blue-200">
-                    <div className="flex items-center justify-between">
-                      <div>
-                        📸 Photo by <span className="text-white font-medium">{aircraftPhoto.photographer}</span>
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-0">
+                    {/* Image on left - smaller */}
+                    <div className="relative">
+                      <img 
+                        src={aircraftPhoto.thumbnailUrl || aircraftPhoto.imageUrl} 
+                        alt={`${flight.aircraft.registration} - ${flight.aircraft.model}`}
+                        className="w-full h-full object-cover"
+                        style={{ maxHeight: '300px' }}
+                        onError={(e) => {
+                          (e.target as HTMLImageElement).style.display = 'none';
+                        }}
+                      />
+                    </div>
+                    
+                    {/* Info on right */}
+                    <div className="bg-white/5 p-4 flex flex-col justify-between">
+                      <div className="space-y-3">
+                        <div>
+                          <div className="text-xs text-blue-300 mb-1">📸 Photographer</div>
+                          <div className="text-sm font-medium text-white">{aircraftPhoto.photographer}</div>
+                        </div>
+                        
                         {aircraftPhoto.photoDate !== 'Unknown' && (
-                          <span className="ml-2">• {aircraftPhoto.photoDate}</span>
+                          <div>
+                            <div className="text-xs text-blue-300 mb-1">📅 Photo Date</div>
+                            <div className="text-sm font-medium text-white">{aircraftPhoto.photoDate}</div>
+                          </div>
+                        )}
+                        
+                        {aircraftPhoto.location !== 'Unknown' && (
+                          <div>
+                            <div className="text-xs text-blue-300 mb-1">📍 Location</div>
+                            <div className="text-sm font-medium text-white">{aircraftPhoto.location}</div>
+                          </div>
+                        )}
+                        
+                        {aircraftPhoto.views > 0 && (
+                          <div className="flex items-center gap-4 text-sm text-blue-200">
+                            <span>👁️ {aircraftPhoto.views.toLocaleString()} views</span>
+                            {aircraftPhoto.likes > 0 && (
+                              <span>❤️ {aircraftPhoto.likes} likes</span>
+                            )}
+                          </div>
                         )}
                       </div>
-                      <a 
-                        href={aircraftPhoto.imageUrl}
-                        target="_blank"
-                        rel="noopener noreferrer"
-                        className="text-blue-300 hover:text-blue-100 transition-colors"
-                      >
-                        View Full Photo →
-                      </a>
-                    </div>
-                    {aircraftPhoto.location !== 'Unknown' && (
-                      <div className="mt-1">📍 {aircraftPhoto.location}</div>
-                    )}
-                    {aircraftPhoto.views > 0 && (
-                      <div className="mt-1">
-                        👁️ {aircraftPhoto.views.toLocaleString()} views
-                        {aircraftPhoto.likes > 0 && ` • ❤️ ${aircraftPhoto.likes} likes`}
+                      
+                      <div className="mt-4 pt-3 border-t border-white/20">
+                        <a 
+                          href={aircraftPhoto.imageUrl}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="inline-flex items-center gap-2 text-blue-300 hover:text-blue-100 transition-colors text-sm font-medium"
+                        >
+                          View Full Photo
+                          <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14" />
+                          </svg>
+                        </a>
                       </div>
-                    )}
+                    </div>
                   </div>
                 </div>
               )}

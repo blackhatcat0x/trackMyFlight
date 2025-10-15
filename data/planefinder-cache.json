@@ -342,5 +342,177 @@
       "scrapedAt": "2025-10-15T18:30:57.234Z"
     },
     "timestamp": 1760553057235
+  },
+  "EZS1050": {
+    "data": {
+      "flightNumber": "EZS1050",
+      "date": "15 Oct 2025",
+      "airline": {
+        "code": "EZS",
+        "name": "Unknown Airline"
+      },
+      "origin": {
+        "code": "ACE",
+        "airport": "César Manrique-Lanzarote Airport",
+        "city": "San Bartolomé",
+        "country": "ES",
+        "flag": "🇪🇸",
+        "latitude": 28.945499,
+        "longitude": -13.6052
+      },
+      "destination": {
+        "code": "BSL",
+        "airport": "EuroAirport Basel–Mulhouse–Freiburg",
+        "city": "Bâle / Mulhouse",
+        "country": "FR",
+        "flag": "🇫🇷",
+        "latitude": 47.60068,
+        "longitude": 7.521117
+      },
+      "departure": {
+        "time": "17:50",
+        "timezone": "WEST"
+      },
+      "arrival": {
+        "time": "20:45",
+        "timezone": "CEST"
+      },
+      "aircraft": {
+        "model": "A20N",
+        "registration": "HB-AYN"
+      },
+      "status": "unknown",
+      "scrapedAt": "2025-10-15T18:45:49.152Z"
+    },
+    "timestamp": 1760553949153
+  },
+  "EJU75WR": {
+    "data": {
+      "flightNumber": "EJU75WR",
+      "date": "15 Oct 2025",
+      "airline": {
+        "code": "EJU",
+        "name": "Unknown Airline"
+      },
+      "origin": {
+        "code": "MAD",
+        "airport": "Adolfo Suárez Madrid–Barajas Airport",
+        "city": "Madrid",
+        "country": "ES",
+        "flag": "🇪🇸",
+        "latitude": 40.471926,
+        "longitude": -3.56264
+      },
+      "destination": {
+        "code": "BSL",
+        "airport": "EuroAirport Basel–Mulhouse–Freiburg",
+        "city": "Bâle / Mulhouse",
+        "country": "FR",
+        "flag": "🇫🇷",
+        "latitude": 47.60068,
+        "longitude": 7.521117
+      },
+      "departure": {
+        "time": "20:30",
+        "timezone": "CEST"
+      },
+      "arrival": {
+        "time": "20:52",
+        "timezone": "CEST"
+      },
+      "aircraft": {
+        "model": "A20N",
+        "registration": "HB-AYQ"
+      },
+      "status": "unknown",
+      "scrapedAt": "2025-10-15T18:52:19.768Z"
+    },
+    "timestamp": 1760554339769
+  },
+  "EZY83ZB": {
+    "data": {
+      "flightNumber": "EZY83ZB",
+      "date": "15 Oct 2025",
+      "airline": {
+        "code": "EZY",
+        "name": "easyJet"
+      },
+      "origin": {
+        "code": "AGP",
+        "airport": "Málaga-Costa del Sol Airport",
+        "city": "Málaga",
+        "country": "ES",
+        "flag": "🇪🇸",
+        "latitude": 36.6749,
+        "longitude": -4.49911
+      },
+      "destination": {
+        "code": "SEN",
+        "airport": "London Southend Airport",
+        "city": "Southend-on-Sea, Essex",
+        "country": "GB",
+        "flag": "🇬🇧",
+        "latitude": 51.570562,
+        "longitude": 0.693627
+      },
+      "departure": {
+        "time": "20:18",
+        "timezone": "CEST"
+      },
+      "arrival": {
+        "time": "22:27",
+        "timezone": "BST"
+      },
+      "aircraft": {
+        "model": "A20N",
+        "registration": "G-UZHF"
+      },
+      "status": "unknown",
+      "scrapedAt": "2025-10-15T18:54:32.333Z"
+    },
+    "timestamp": 1760554472334
+  },
+  "EZY34NW": {
+    "data": {
+      "flightNumber": "EZY34NW",
+      "date": "15 Oct 2025",
+      "airline": {
+        "code": "EZY",
+        "name": "easyJet"
+      },
+      "origin": {
+        "code": "LGW",
+        "airport": "London Gatwick Airport",
+        "city": "London",
+        "country": "GB",
+        "flag": "🇬🇧",
+        "latitude": 51.148771,
+        "longitude": -0.192089
+      },
+      "destination": {
+        "code": "MLA",
+        "airport": "Malta International Airport",
+        "city": "Valletta",
+        "country": "MT",
+        "flag": "🇲🇹",
+        "latitude": 35.857498,
+        "longitude": 14.4775
+      },
+      "departure": {
+        "time": "18:00",
+        "timezone": "BST"
+      },
+      "arrival": {
+        "time": "20:58",
+        "timezone": "CEST"
+      },
+      "aircraft": {
+        "model": "A320",
+        "registration": "G-EJCF"
+      },
+      "status": "unknown",
+      "scrapedAt": "2025-10-15T18:59:04.502Z"
+    },
+    "timestamp": 1760554744503
   }
 }

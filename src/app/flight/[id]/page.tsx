@@ -29,27 +29,13 @@ const extractFlightNumber = (flightId: string): string => {
 }
 
 // Helper function to convert times to user's local timezone
+// Helper function to convert times to user's local timezone
 const convertToLocalTime = (time: string, timezone: string, date?: string): string => {
   try {
-    // Parse the time (e.g., "11:40")
+    console.log(`🔄 Converting time: ${time} ${timezone} (date: ${date})`);
+    
+    // Parse the time (e.g., "20:45")
     const [hours, minutes] = time.split(':').map(Number);
-    
-    // Use provided date or today
-    const today = new Date();
-    let dateObj = today;
-    
-    if (date) {
-      // Parse date like "15 Oct 2025"
-      const [day, monthStr, year] = date.split(' ');
-      const monthMap: Record<string, number> = {
-        'Jan': 0, 'Feb': 1, 'Mar': 2, 'Apr': 3, 'May': 4, 'Jun': 5,
-        'Jul': 6, 'Aug': 7, 'Sep': 8, 'Oct': 9, 'Nov': 10, 'Dec': 11
-      };
-      const monthNum = monthMap[monthStr] ?? today.getMonth();
-      dateObj = new Date(parseInt(year), monthNum, parseInt(day), hours, minutes);
-    } else {
-      dateObj = new Date(today.getFullYear(), today.getMonth(), today.getDate(), hours, minutes);
-    }
     
     // Timezone offset mapping (hours from UTC)
     const timezoneOffsets: Record<string, number> = {
@@ -64,16 +50,42 @@ const convertToLocalTime = (time: string, timezone: string, date?: string): stri
     };
     
     const tzOffset = timezoneOffsets[timezone] ?? 0;
+    console.log(`🌍 Timezone ${timezone} offset: UTC+${tzOffset}`);
     
-    // Convert to UTC first
-    const utcTime = new Date(dateObj.getTime() - (tzOffset * 60 * 60 * 1000));
+    // Parse the date
+    let year, month, day;
+    if (date) {
+      const [dayStr, monthStr, yearStr] = date.split(' ');
+      const monthMap: Record<string, number> = {
+        'Jan': 0, 'Feb': 1, 'Mar': 2, 'Apr': 3, 'May': 4, 'Jun': 5,
+        'Jul': 6, 'Aug': 7, 'Sep': 8, 'Oct': 9, 'Nov': 10, 'Dec': 11
+      };
+      year = parseInt(yearStr);
+      month = monthMap[monthStr] ?? new Date().getMonth();
+      day = parseInt(dayStr);
+    } else {
+      const today = new Date();
+      year = today.getFullYear();
+      month = today.getMonth();
+      day = today.getDate();
+    }
     
-    // Browser will automatically convert UTC to user's local timezone
-    return utcTime.toLocaleTimeString(undefined, { 
+    // Create UTC date by using Date.UTC (this creates a timestamp in UTC)
+    // Subtract the timezone offset to get the actual UTC time
+    const utcTimestamp = Date.UTC(year, month, day, hours, minutes) - (tzOffset * 60 * 60 * 1000);
+    const utcDate = new Date(utcTimestamp);
+    
+    console.log(`🌐 UTC time: ${utcDate.toISOString()}`);
+    
+    // Now convert to local timezone (browser does this automatically)
+    const localTime = utcDate.toLocaleTimeString(undefined, { 
       hour: '2-digit', 
       minute: '2-digit',
       hour12: false 
     });
+    
+    console.log(`✅ Final local time: ${localTime}`);
+    return localTime;
   } catch (e) {
     console.error('Time conversion error:', e);
     return time; // Return original if conversion fails
@@ -304,7 +316,6 @@ export default function FlightDetailPage({ params }: { params: { id: string } })
   const [userTimezone, setUserTimezone] = useState<string>('Local')
   const [aircraftPhoto, setAircraftPhoto] = useState<any>(null)
   const [loadingPhoto, setLoadingPhoto] = useState(false)
-  
   const router = useRouter()
   
   const hasMountedRef = useRef(false);
@@ -430,6 +441,28 @@ export default function FlightDetailPage({ params }: { params: { id: string } })
     };
   }, [params.id]);
 
+  // Fetch aircraft photo when flight data is loaded
+  useEffect(() => {
+    if (flight?.aircraft?.registration) {
+      const fetchAircraftPhoto = async () => {
+        setLoadingPhoto(true);
+        try {
+          const response = await fetch(`/api/aircraft-photo?registration=${encodeURIComponent(flight.aircraft!.registration!)}`);
+          if (response.ok) {
+            const data = await response.json();
+            setAircraftPhoto(data.photo);
+            console.log('✅ Aircraft photo loaded:', data.photo);
+          }
+        } catch (error) {
+          console.warn('Failed to load aircraft photo:', error);
+        } finally {
+          setLoadingPhoto(false);
+        }
+      };
+      fetchAircraftPhoto();
+    }
+  }, [flight?.aircraft?.registration]);
+
   const handleBack = () => router.push('/search')
 
   const formatTime = (date: Date | string | undefined) => {
@@ -453,29 +486,6 @@ export default function FlightDetailPage({ params }: { params: { id: string } })
       day: 'numeric'
     }).format(dateObj)
   }
-
-
-  useEffect(() => {
-  if (flight?.aircraft?.registration) {
-    const fetchAircraftPhoto = async () => {
-      setLoadingPhoto(true);
-      try {
-        const response = await fetch(`/api/aircraft-photo?registration=${encodeURIComponent(flight.aircraft!.registration!)}`);
-        if (response.ok) {
-          const data = await response.json();
-          setAircraftPhoto(data.photo);
-          console.log('✅ Aircraft photo loaded:', data.photo);
-        }
-      } catch (error) {
-        console.warn('Failed to load aircraft photo:', error);
-      } finally {
-        setLoadingPhoto(false);
-      }
-    };
-    fetchAircraftPhoto();
-  }
-}, [flight?.aircraft?.registration]);
-
 
   if (loading) {
     return (
@@ -603,13 +613,17 @@ export default function FlightDetailPage({ params }: { params: { id: string } })
                       {(flight as any).departure.time} {(flight as any).departure.timezone}
                     </div>
                     <div className="text-xs text-blue-200">
-                      ({userTimezone}: {convertToLocalTime((flight as any).departure.time, (flight as any).departure.timezone, (flight as any).date)})
+                      ({userTimezone}: {(() => {
+                        const result = convertToLocalTime((flight as any).departure.time, (flight as any).departure.timezone, (flight as any).date);
+                        console.log('✅ Departure conversion result:', result);
+                        return result;
+                      })()})
                     </div>
                   </div>
                 )}
               </div>
               <div className="text-center">
-                <div className="text-blue-400 text-6xl">→</div>
+                <div className="text-blue-400 text-2xl">→</div>
               </div>
               <div className="text-center">
                 <div className="flex items-center justify-center gap-2 mb-2">
@@ -631,7 +645,11 @@ export default function FlightDetailPage({ params }: { params: { id: string } })
                       {(flight as any).arrival.time} {(flight as any).arrival.timezone}
                     </div>
                     <div className="text-xs text-blue-200">
-                      ({userTimezone}: {convertToLocalTime((flight as any).arrival.time, (flight as any).arrival.timezone, (flight as any).date)})
+                      ({userTimezone}: {(() => {
+                        const result = convertToLocalTime((flight as any).arrival.time, (flight as any).arrival.timezone, (flight as any).date);
+                        console.log('✅ Arrival conversion result:', result);
+                        return result;
+                      })()})
                     </div>
                   </div>
                 )}
@@ -748,69 +766,43 @@ export default function FlightDetailPage({ params }: { params: { id: string } })
             <div className="bg-white/10 backdrop-blur-md rounded-2xl shadow-2xl p-6 border border-white/20 mb-6">
               <h3 className="text-xl font-bold text-white mb-4">Aircraft Information</h3>
               
-              {/* Aircraft Photo with side-by-side layout */}
+              {/* Aircraft Photo */}
               {aircraftPhoto && (
                 <div className="mb-6 rounded-lg overflow-hidden border border-white/20">
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-0">
-                    {/* Image on left - smaller */}
-                    <div className="relative">
-                      <img 
-                        src={aircraftPhoto.thumbnailUrl || aircraftPhoto.imageUrl} 
-                        alt={`${flight.aircraft.registration} - ${flight.aircraft.model}`}
-                        className="w-full h-full object-cover"
-                        style={{ maxHeight: '300px' }}
-                        onError={(e) => {
-                          (e.target as HTMLImageElement).style.display = 'none';
-                        }}
-                      />
-                    </div>
-                    
-                    {/* Info on right */}
-                    <div className="bg-white/5 p-4 flex flex-col justify-between">
-                      <div className="space-y-3">
-                        <div>
-                          <div className="text-xs text-blue-300 mb-1">📸 Photographer</div>
-                          <div className="text-sm font-medium text-white">{aircraftPhoto.photographer}</div>
-                        </div>
-                        
+                  <img 
+                    src={aircraftPhoto.thumbnailUrl || aircraftPhoto.imageUrl} 
+                    alt={`${flight.aircraft.registration} - ${flight.aircraft.model}`}
+                    className="w-full h-64 object-cover"
+                    onError={(e) => {
+                      (e.target as HTMLImageElement).style.display = 'none';
+                    }}
+                  />
+                  <div className="bg-white/5 p-3 text-xs text-blue-200">
+                    <div className="flex items-center justify-between">
+                      <div>
+                        📸 Photo by <span className="text-white font-medium">{aircraftPhoto.photographer}</span>
                         {aircraftPhoto.photoDate !== 'Unknown' && (
-                          <div>
-                            <div className="text-xs text-blue-300 mb-1">📅 Photo Date</div>
-                            <div className="text-sm font-medium text-white">{aircraftPhoto.photoDate}</div>
-                          </div>
-                        )}
-                        
-                        {aircraftPhoto.location !== 'Unknown' && (
-                          <div>
-                            <div className="text-xs text-blue-300 mb-1">📍 Location</div>
-                            <div className="text-sm font-medium text-white">{aircraftPhoto.location}</div>
-                          </div>
-                        )}
-                        
-                        {aircraftPhoto.views > 0 && (
-                          <div className="flex items-center gap-4 text-sm text-blue-200">
-                            <span>👁️ {aircraftPhoto.views.toLocaleString()} views</span>
-                            {aircraftPhoto.likes > 0 && (
-                              <span>❤️ {aircraftPhoto.likes} likes</span>
-                            )}
-                          </div>
+                          <span className="ml-2">• {aircraftPhoto.photoDate}</span>
                         )}
                       </div>
-                      
-                      <div className="mt-4 pt-3 border-t border-white/20">
-                        <a 
-                          href={aircraftPhoto.imageUrl}
-                          target="_blank"
-                          rel="noopener noreferrer"
-                          className="inline-flex items-center gap-2 text-blue-300 hover:text-blue-100 transition-colors text-sm font-medium"
-                        >
-                          View Full Photo
-                          <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14" />
-                          </svg>
-                        </a>
-                      </div>
+                      <a 
+                        href={aircraftPhoto.imageUrl}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="text-blue-300 hover:text-blue-100 transition-colors"
+                      >
+                        View Full Photo →
+                      </a>
                     </div>
+                    {aircraftPhoto.location !== 'Unknown' && (
+                      <div className="mt-1">📍 {aircraftPhoto.location}</div>
+                    )}
+                    {aircraftPhoto.views > 0 && (
+                      <div className="mt-1">
+                        👁️ {aircraftPhoto.views.toLocaleString()} views
+                        {aircraftPhoto.likes > 0 && ` • ❤️ ${aircraftPhoto.likes} likes`}
+                      </div>
+                    )}
                   </div>
                 </div>
               )}

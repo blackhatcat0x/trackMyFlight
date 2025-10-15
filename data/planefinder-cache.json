@@ -288,7 +288,7 @@
         "timezone": "BST"
       },
       "arrival": {
-        "time": "18:44",
+        "time": "19:16",
         "timezone": "WEST"
       },
       "aircraft": {
@@ -296,8 +296,51 @@
         "registration": "G-EZGN"
       },
       "status": "unknown",
-      "scrapedAt": "2025-10-15T17:44:57.243Z"
+      "scrapedAt": "2025-10-15T18:16:56.586Z"
     },
-    "timestamp": 1760550297244
+    "timestamp": 1760552216587
+  },
+  "EZS29RC": {
+    "data": {
+      "flightNumber": "EZS29RC",
+      "date": "15 Oct 2025",
+      "airline": {
+        "code": "EZS",
+        "name": "Unknown Airline"
+      },
+      "origin": {
+        "code": "GVA",
+        "airport": "Geneva Cointrin International Airport",
+        "city": "Geneva",
+        "country": "CH",
+        "flag": "🇨🇭",
+        "latitude": 46.238098,
+        "longitude": 6.10895
+      },
+      "destination": {
+        "code": "FCO",
+        "airport": "Rome–Fiumicino Leonardo da Vinci International Airport",
+        "city": "Rome",
+        "country": "IT",
+        "flag": "🇮🇹",
+        "latitude": 41.804532,
+        "longitude": 12.251998
+      },
+      "departure": {
+        "time": "19:25",
+        "timezone": "CEST"
+      },
+      "arrival": {
+        "time": "20:30",
+        "timezone": "CEST"
+      },
+      "aircraft": {
+        "model": "A320",
+        "registration": "HB-JXK"
+      },
+      "status": "unknown",
+      "scrapedAt": "2025-10-15T18:30:57.234Z"
+    },
+    "timestamp": 1760553057235
   }
 }

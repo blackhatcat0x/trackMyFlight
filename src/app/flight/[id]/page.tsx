@@ -302,6 +302,9 @@ export default function FlightDetailPage({ params }: { params: { id: string } })
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
   const [userTimezone, setUserTimezone] = useState<string>('Local')
+  const [aircraftPhoto, setAircraftPhoto] = useState<any>(null)
+  const [loadingPhoto, setLoadingPhoto] = useState(false)
+  
   const router = useRouter()
   
   const hasMountedRef = useRef(false);
@@ -451,6 +454,29 @@ export default function FlightDetailPage({ params }: { params: { id: string } })
     }).format(dateObj)
   }
 
+
+  useEffect(() => {
+  if (flight?.aircraft?.registration) {
+    const fetchAircraftPhoto = async () => {
+      setLoadingPhoto(true);
+      try {
+        const response = await fetch(`/api/aircraft-photo?registration=${encodeURIComponent(flight.aircraft!.registration!)}`);
+        if (response.ok) {
+          const data = await response.json();
+          setAircraftPhoto(data.photo);
+          console.log('✅ Aircraft photo loaded:', data.photo);
+        }
+      } catch (error) {
+        console.warn('Failed to load aircraft photo:', error);
+      } finally {
+        setLoadingPhoto(false);
+      }
+    };
+    fetchAircraftPhoto();
+  }
+}, [flight?.aircraft?.registration]);
+
+
   if (loading) {
     return (
       <div className="min-h-screen bg-gradient-to-br from-slate-900 via-blue-900 to-slate-900 flex items-center justify-center">
@@ -583,7 +609,7 @@ export default function FlightDetailPage({ params }: { params: { id: string } })
                 )}
               </div>
               <div className="text-center">
-                <div className="text-blue-400 text-2xl">→</div>
+                <div className="text-blue-400 text-6xl">→</div>
               </div>
               <div className="text-center">
                 <div className="flex items-center justify-center gap-2 mb-2">
@@ -721,17 +747,106 @@ export default function FlightDetailPage({ params }: { params: { id: string } })
           {flight.aircraft && (
             <div className="bg-white/10 backdrop-blur-md rounded-2xl shadow-2xl p-6 border border-white/20 mb-6">
               <h3 className="text-xl font-bold text-white mb-4">Aircraft Information</h3>
+              
+              {/* Aircraft Photo with side-by-side layout */}
+              {aircraftPhoto && (
+                <div className="mb-6 rounded-lg overflow-hidden border border-white/20">
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-0">
+                    {/* Image on left - smaller */}
+                    <div className="relative">
+                      <img 
+                        src={aircraftPhoto.thumbnailUrl || aircraftPhoto.imageUrl} 
+                        alt={`${flight.aircraft.registration} - ${flight.aircraft.model}`}
+                        className="w-full h-full object-cover"
+                        style={{ maxHeight: '300px' }}
+                        onError={(e) => {
+                          (e.target as HTMLImageElement).style.display = 'none';
+                        }}
+                      />
+                    </div>
+                    
+                    {/* Info on right */}
+                    <div className="bg-white/5 p-4 flex flex-col justify-between">
+                      <div className="space-y-3">
+                        <div>
+                          <div className="text-xs text-blue-300 mb-1">📸 Photographer</div>
+                          <div className="text-sm font-medium text-white">{aircraftPhoto.photographer}</div>
+                        </div>
+                        
+                        {aircraftPhoto.photoDate !== 'Unknown' && (
+                          <div>
+                            <div className="text-xs text-blue-300 mb-1">📅 Photo Date</div>
+                            <div className="text-sm font-medium text-white">{aircraftPhoto.photoDate}</div>
+                          </div>
+                        )}
+                        
+                        {aircraftPhoto.location !== 'Unknown' && (
+                          <div>
+                            <div className="text-xs text-blue-300 mb-1">📍 Location</div>
+                            <div className="text-sm font-medium text-white">{aircraftPhoto.location}</div>
+                          </div>
+                        )}
+                        
+                        {aircraftPhoto.views > 0 && (
+                          <div className="flex items-center gap-4 text-sm text-blue-200">
+                            <span>👁️ {aircraftPhoto.views.toLocaleString()} views</span>
+                            {aircraftPhoto.likes > 0 && (
+                              <span>❤️ {aircraftPhoto.likes} likes</span>
+                            )}
+                          </div>
+                        )}
+                      </div>
+                      
+                      <div className="mt-4 pt-3 border-t border-white/20">
+                        <a 
+                          href={aircraftPhoto.imageUrl}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="inline-flex items-center gap-2 text-blue-300 hover:text-blue-100 transition-colors text-sm font-medium"
+                        >
+                          View Full Photo
+                          <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14" />
+                          </svg>
+                        </a>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              )}
+              
+              {loadingPhoto && !aircraftPhoto && (
+                <div className="mb-6 rounded-lg border border-white/20 bg-white/5 h-64 flex items-center justify-center">
+                  <div className="text-center">
+                    <div className="inline-block animate-spin rounded-full h-8 w-8 border-b-2 border-blue-400 mb-2"></div>
+                    <p className="text-blue-200 text-sm">Loading aircraft photo...</p>
+                  </div>
+                </div>
+              )}
+
               <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                 {flight.aircraft.registration && (
                   <div className="bg-white/5 rounded-lg p-3 border border-white/10">
                     <div className="text-xs text-blue-300">Registration</div>
                     <div className="text-sm font-medium text-white">{flight.aircraft.registration}</div>
+                    {aircraftPhoto?.serialNumber && aircraftPhoto.serialNumber !== 'Unknown' && (
+                      <div className="text-xs text-blue-200 mt-1">S/N: {aircraftPhoto.serialNumber}</div>
+                    )}
                   </div>
                 )}
                 {flight.aircraft.model && (
                   <div className="bg-white/5 rounded-lg p-3 border border-white/10">
                     <div className="text-xs text-blue-300">Model</div>
                     <div className="text-sm font-medium text-white">{flight.aircraft.model}</div>
+                    {aircraftPhoto?.aircraftType && aircraftPhoto.aircraftType !== 'Unknown' && aircraftPhoto.aircraftType !== flight.aircraft.model && (
+                      <div className="text-xs text-blue-200 mt-1">{aircraftPhoto.aircraftType}</div>
+                    )}
+                  </div>
+                )}
+                {aircraftPhoto?.airline && aircraftPhoto.airline !== 'Unknown' && (
+                  <div className="bg-white/5 rounded-lg p-3 border border-white/10">
+                    <div className="text-xs text-blue-300">Operator</div>
+                    <div className="text-sm font-medium text-white">{aircraftPhoto.airline}</div>
                   </div>
                 )}
               </div>

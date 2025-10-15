@@ -59,6 +59,11 @@ type Flight = {
     departure: { time: string; timezone: string }
     arrival: { time: string; timezone: string }
   }
+  enrichedData?: {
+    source: string
+    scrapedAt: string
+    date: string
+  }
   sources?: {
     planefinder?: {
       scrapedAt: string
@@ -103,20 +108,11 @@ export default function SearchPage() {
           setSearchError(msg)
         }
       } else {
-        // Handle specific error types
-        if (result.error === 'Aviationstack API Unavailable') {
-          setSearchError(`⚠️ Flight data service temporarily unavailable\n\n${result.message}\n\nPlease try again in a moment.`)
-        } else if (result.error === 'API Plan Limitation') {
-          setSearchError(`${result.message}\n\n💡 ${result.suggestion}`)
-        } else if (result.error === 'HTTPS Not Supported') {
-          setSearchError(`${result.message}\n\n💡 ${result.suggestion}`)
-        } else {
-          throw new Error(result.error || result.message || 'Search failed')
-        }
+        throw new Error(result.error || result.message || 'Search failed')
       }
     } catch (error) {
       console.error('Search failed:', error)
-      setSearchError('Search failed. Please check your API key and try again.')
+      setSearchError('Search failed. Please try again.')
       setSearchResults([])
     } finally {
       setIsSearching(false)
@@ -124,6 +120,13 @@ export default function SearchPage() {
   }
 
   const handleFlightClick = (flight: Flight) => {
+    // Store flight data in sessionStorage with unique key
+    try {
+      sessionStorage.setItem(`flight_${flight.id}`, JSON.stringify(flight))
+      console.log('✅ Stored flight data in sessionStorage:', flight.id)
+    } catch (e) {
+      console.warn('Failed to store in sessionStorage:', e)
+    }
     router.push(`/flight/${encodeURIComponent(flight.id)}`)
   }
 
@@ -171,33 +174,22 @@ export default function SearchPage() {
     return parts.join(' • ')
   }
 
-
   function getFlightStatus(flight: Flight): { status: string; display: string } {
-  // If we have live data, the flight is definitely in the air
-  if (flight.live && flight.live.lat && flight.live.lon) {
-    return { status: 'departed', display: 'In Flight' }
-  }
-  
-  // Use the status from enriched data if available
-  if (flight.status && flight.status !== 'unknown') {
-    return { 
-      status: flight.status, 
-      display: flight.status.charAt(0).toUpperCase() + flight.status.slice(1) 
+    if (flight.live && flight.live.lat && flight.live.lon) {
+      return { status: 'departed', display: 'In Flight' }
     }
+    if (flight.status && flight.status !== 'unknown') {
+      return { 
+        status: flight.status, 
+        display: flight.status.charAt(0).toUpperCase() + flight.status.slice(1) 
+      }
+    }
+    return { status: 'scheduled', display: 'Scheduled' }
   }
-  
-  // Default to scheduled if we have no other info
-  return { status: 'scheduled', display: 'Scheduled' }
-}
-
-
 
   const getRecentSearches = () => {
     try {
-      // Import the cache data dynamically
       const cache = require('../../../data/planefinder-cache.json') as Record<string, any>
-      
-      // Convert to array and sort by timestamp (most recent first)
       const flights = Object.entries(cache)
         .map(([flightNumber, entry]) => ({
           flightNumber,
@@ -206,7 +198,6 @@ export default function SearchPage() {
         }))
         .sort((a, b) => b.timestamp - a.timestamp)
 
-      // Deduplicate by route (origin-destination)
       const routeMap = new Map<string, any>()
       flights.forEach(flight => {
         const routeKey = `${flight.origin?.code}-${flight.destination?.code}`
@@ -215,10 +206,8 @@ export default function SearchPage() {
         }
       })
 
-      // Convert back to array and take top 6
       const uniqueFlights = Array.from(routeMap.values()).slice(0, 6)
       
-      // Transform into search item format
       return uniqueFlights.map(flight => ({
         term: flight.flightNumber,
         desc: `${flight.origin?.city || flight.origin?.code} to ${flight.destination?.city || flight.destination?.code}`,
@@ -236,15 +225,12 @@ export default function SearchPage() {
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-slate-900 via-blue-900 to-slate-900">
-      {/* Animated background */}
       <div className="fixed inset-0 overflow-hidden">
         <div className="absolute -top-40 -right-40 w-80 h-80 bg-blue-500 rounded-full mix-blend-multiply filter blur-xl opacity-20 animate-pulse"></div>
         <div className="absolute -bottom-40 -left-40 w-80 h-80 bg-purple-500 rounded-full mix-blend-multiply filter blur-xl opacity-20 animate-pulse"></div>
       </div>
 
-      {/* Main content */}
       <div className="relative z-10 min-h-screen flex flex-col">
-        {/* Header */}
         <div className="bg-white/10 backdrop-blur-md border-b border-white/20">
           <div className="max-w-4xl mx-auto px-4 py-4">
             <div className="flex items-center gap-4">
@@ -267,7 +253,6 @@ export default function SearchPage() {
           </div>
         </div>
 
-        {/* Search Section */}
         <div className="flex-1 flex items-center justify-center p-4">
           <div className="w-full max-w-2xl">
             <div className="bg-white/10 backdrop-blur-md rounded-2xl shadow-2xl p-8 border border-white/20">
@@ -288,7 +273,6 @@ export default function SearchPage() {
                 <p className="text-blue-200">Find live flights in real-time</p>
               </div>
 
-              {/* Search Type Selector */}
               <div className="mb-6 bg-white/10 rounded-lg p-1 backdrop-blur-sm">
                 <button
                   className="w-full py-3 px-4 rounded-md transition-all transform hover:scale-105 bg-gradient-to-r from-blue-500 to-cyan-500 text-white shadow-lg"
@@ -298,8 +282,6 @@ export default function SearchPage() {
                 </button>
               </div>
 
-
-              {/* Search Form */}
               <form onSubmit={handleSearch} className="space-y-4">
                 <div className="relative group">
                   <div className="absolute inset-y-0 left-0 pl-4 flex items-center pointer-events-none">
@@ -346,7 +328,6 @@ export default function SearchPage() {
                 </button>
               </form>
 
-              {/* Search Results */}
               {hasSearched && (
                 <div className="mt-8">
                   {isSearching ? (
@@ -364,7 +345,6 @@ export default function SearchPage() {
                       <h3 className="text-lg font-semibold text-white mb-4">
                         Found {searchResults.length} flight{searchResults.length !== 1 ? 's' : ''}
                       </h3>
-
 
                       <div className="space-y-3">
                         {searchResults.map((flight) => (
@@ -449,7 +429,7 @@ export default function SearchPage() {
                             )}
 
                             {flight.aircraft && (flight.aircraft.model || flight.aircraft.registration) && (
-                              <div className="mt-2 pb-3 border-t border-white/10">
+                              <div className="mt-2 pt-3 border-t border-white/10">
                                 <div className="flex items-center gap-4 text-sm text-blue-200">
                                   <svg className="w-4 h-4 text-blue-300" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 21v-4m0 0l2-2m0 0l7-7m7 7l-7-7m0 0l2-2m-2 2h8M3 17V7a2 2 0 012-2h8a2 2 0 012 2v10M3 7a2 2 0 012-2h8a2 2 0 012 2M9 3a1 1 0 011-1h4a1 1 0 011 1H8z" />
@@ -477,7 +457,6 @@ export default function SearchPage() {
                 </div>
               )}
 
-              {/* Recent Searches */}
               <div className="mt-8">
                 <h3 className="text-lg font-semibold text-white mb-4 flex items-center gap-2">
                   <span className="text-2xl">🕐</span>
@@ -526,7 +505,6 @@ export default function SearchPage() {
                 )}
               </div>
 
-              {/* Features */}
               <div className="mt-8 pt-6 border-t border-white/20">
                 <div className="grid grid-cols-1 md:grid-cols-3 gap-4 text-center">
                   <div className="bg-white/5 rounded-lg p-3 border border-white/10">

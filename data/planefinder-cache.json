@@ -213,5 +213,91 @@
       "scrapedAt": "2025-10-13T12:40:36.165Z"
     },
     "timestamp": 1760359236166
+  },
+  "EJU43VU": {
+    "data": {
+      "flightNumber": "EJU43VU",
+      "date": "15 Oct 2025",
+      "airline": {
+        "code": "EJU",
+        "name": "Unknown Airline"
+      },
+      "origin": {
+        "code": "LPA",
+        "airport": "Gran Canaria Airport",
+        "city": "Gran Canaria Island",
+        "country": "ES",
+        "flag": "🇪🇸",
+        "latitude": 27.9319,
+        "longitude": -15.3866
+      },
+      "destination": {
+        "code": "MXP",
+        "airport": "Milan Malpensa International Airport",
+        "city": "Ferno (VA)",
+        "country": "IT",
+        "flag": "🇮🇹",
+        "latitude": 45.6306,
+        "longitude": 8.72811
+      },
+      "departure": {
+        "time": "11:40",
+        "timezone": "WEST"
+      },
+      "arrival": {
+        "time": "15:52",
+        "timezone": "CEST"
+      },
+      "aircraft": {
+        "model": "A320",
+        "registration": "OE-IJZ"
+      },
+      "status": "unknown",
+      "scrapedAt": "2025-10-15T13:52:41.214Z"
+    },
+    "timestamp": 1760536361215
+  },
+  "EZY46BL": {
+    "data": {
+      "flightNumber": "EZY46BL",
+      "date": "15 Oct 2025",
+      "airline": {
+        "code": "EZY",
+        "name": "easyJet"
+      },
+      "origin": {
+        "code": "BFS",
+        "airport": "Belfast International Airport",
+        "city": "Belfast",
+        "country": "GB",
+        "flag": "🇬🇧",
+        "latitude": 54.6575012207,
+        "longitude": -6.2158298492399995
+      },
+      "destination": {
+        "code": "FAO",
+        "airport": "Faro Airport",
+        "city": "Faro",
+        "country": "PT",
+        "flag": "🇵🇹",
+        "latitude": 37.0144004822,
+        "longitude": -7.96590995789
+      },
+      "departure": {
+        "time": "16:55",
+        "timezone": "BST"
+      },
+      "arrival": {
+        "time": "18:44",
+        "timezone": "WEST"
+      },
+      "aircraft": {
+        "model": "A319",
+        "registration": "G-EZGN"
+      },
+      "status": "unknown",
+      "scrapedAt": "2025-10-15T17:44:57.243Z"
+    },
+    "timestamp": 1760550297244
   }
 }

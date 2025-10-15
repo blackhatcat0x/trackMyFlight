@@ -7,6 +7,13 @@ import { useState } from 'react'
 export default function LearnMore() {
   const router = useRouter()
   const [activeSection, setActiveSection] = useState<string | null>(null)
+  const [showFeedbackModal, setShowFeedbackModal] = useState(false)
+  const [feedbackType, setFeedbackType] = useState<'thanks' | 'note'>('thanks')
+  const [feedbackMessage, setFeedbackMessage] = useState('')
+  const [feedbackName, setFeedbackName] = useState('')
+  const [feedbackEmail, setFeedbackEmail] = useState('')
+  const [isSubmitting, setIsSubmitting] = useState(false)
+  const [submitMessage, setSubmitMessage] = useState('')
 
   const handleGetStarted = () => {
     router.push('/search')
@@ -14,6 +21,46 @@ export default function LearnMore() {
 
   const handleBackToHome = () => {
     router.push('/')
+  }
+
+  const handleFeedbackSubmit = async (e: React.FormEvent) => {
+    e.preventDefault()
+    setIsSubmitting(true)
+    setSubmitMessage('')
+
+    try {
+      const response = await fetch('/api/feedback', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          type: feedbackType,
+          message: feedbackMessage,
+          name: feedbackName,
+          email: feedbackEmail,
+        }),
+      })
+
+      const data = await response.json()
+
+      if (data.success) {
+        setSubmitMessage('Thank you for your feedback! 🎉')
+        setTimeout(() => {
+          setShowFeedbackModal(false)
+          setFeedbackMessage('')
+          setFeedbackName('')
+          setFeedbackEmail('')
+          setSubmitMessage('')
+        }, 2000)
+      } else {
+        setSubmitMessage('Failed to submit feedback. Please try again.')
+      }
+    } catch (error) {
+      setSubmitMessage('Failed to submit feedback. Please try again.')
+    } finally {
+      setIsSubmitting(false)
+    }
   }
 
   const features = [
@@ -57,7 +104,7 @@ export default function LearnMore() {
       </div>
 
       {/* Navigation */}
-      <div className="relative z-10 sticky top-0 bg-white/5 backdrop-blur-md border-b border-white/10">
+      <div className="relative z-50 sticky top-0 bg-white/5 backdrop-blur-md border-b border-white/10">
         <div className="max-w-6xl mx-auto px-4 py-4 flex items-center justify-between">
           <button 
             onClick={handleBackToHome}
@@ -357,6 +404,29 @@ export default function LearnMore() {
               Your feedback keeps us motivated and helps shape future updates.
             </p>
             
+            <div className="flex flex-col sm:flex-row gap-4 justify-center mb-6">
+              <button 
+                onClick={() => {
+                  setFeedbackType('thanks')
+                  setShowFeedbackModal(true)
+                }}
+                className="bg-gradient-to-r from-pink-500 to-red-500 hover:from-pink-600 hover:to-red-600 text-white font-bold py-3 px-6 rounded-xl transition-all transform hover:scale-105 shadow-lg hover:shadow-xl flex items-center gap-2"
+              >
+                <span>❤️</span>
+                Say Thanks
+              </button>
+              <button 
+                onClick={() => {
+                  setFeedbackType('note')
+                  setShowFeedbackModal(true)
+                }}
+                className="bg-white/10 backdrop-blur-md hover:bg-white/20 text-white font-bold py-3 px-6 rounded-xl transition-all transform hover:scale-105 shadow-lg hover:shadow-xl border border-white/20 flex items-center gap-2"
+              >
+                <span>📝</span>
+                Leave a Note
+              </button>
+            </div>
+            
             <p className="text-lg text-white leading-relaxed">
               Together, we can make flight tracking simpler, faster, and friendlier for everyone.
             </p>
@@ -389,6 +459,130 @@ export default function LearnMore() {
             </div>
           </div>
         </div>
+
+        {/* Feedback Modal */}
+        {showFeedbackModal && (
+          <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+            {/* Backdrop */}
+            <div 
+              className="absolute inset-0 bg-black/60 backdrop-blur-sm"
+              onClick={() => setShowFeedbackModal(false)}
+            />
+            
+            {/* Modal Content */}
+            <div className="relative bg-gradient-to-br from-slate-800 to-slate-900 rounded-2xl shadow-2xl border border-white/20 max-w-md w-full max-h-[90vh] overflow-y-auto">
+              <div className="p-6">
+                {/* Header */}
+                <div className="flex items-center justify-between mb-6">
+                  <h3 className="text-2xl font-bold text-white">
+                    {feedbackType === 'thanks' ? '🎉 Say Thanks!' : '📝 Leave a Note'}
+                  </h3>
+                  <button
+                    onClick={() => setShowFeedbackModal(false)}
+                    className="text-white/60 hover:text-white transition-colors"
+                  >
+                    <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                    </svg>
+                  </button>
+                </div>
+
+                {/* Form */}
+                <form onSubmit={handleFeedbackSubmit} className="space-y-4">
+                  {feedbackType === 'thanks' ? (
+                    <div className="text-center py-4">
+                      <p className="text-lg text-blue-100 mb-4">
+                        Just click submit to send us some love! ❤️
+                      </p>
+                      <p className="text-sm text-blue-200">
+                        Your appreciation means the world to us and keeps us motivated to keep improving TrackMyFlight.
+                      </p>
+                    </div>
+                  ) : (
+                    <div>
+                      <label className="block text-sm font-medium text-blue-200 mb-2">
+                        Your Message *
+                      </label>
+                      <textarea
+                        value={feedbackMessage}
+                        onChange={(e) => setFeedbackMessage(e.target.value)}
+                        className="w-full px-4 py-3 bg-white/10 border border-white/20 rounded-lg text-white placeholder-white/50 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent resize-none"
+                        rows={4}
+                        placeholder="Share your thoughts, suggestions, or experiences with TrackMyFlight..."
+                        required
+                      />
+                    </div>
+                  )}
+
+                  {/* Name Field (Optional) */}
+                  <div>
+                    <label className="block text-sm font-medium text-blue-200 mb-2">
+                      Name (Optional)
+                    </label>
+                    <input
+                      type="text"
+                      value={feedbackName}
+                      onChange={(e) => setFeedbackName(e.target.value)}
+                      className="w-full px-4 py-3 bg-white/10 border border-white/20 rounded-lg text-white placeholder-white/50 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                      placeholder="Your name"
+                    />
+                  </div>
+
+                  {/* Email Field (Optional) */}
+                  <div>
+                    <label className="block text-sm font-medium text-blue-200 mb-2">
+                      Email (Optional)
+                    </label>
+                    <input
+                      type="email"
+                      value={feedbackEmail}
+                      onChange={(e) => setFeedbackEmail(e.target.value)}
+                      className="w-full px-4 py-3 bg-white/10 border border-white/20 rounded-lg text-white placeholder-white/50 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                      placeholder="your@email.com"
+                    />
+                  </div>
+
+                  {/* Privacy Note */}
+                  <div className="text-xs text-blue-300 bg-white/5 rounded-lg p-3 border border-white/10">
+                    <p>
+                      📝 We respect your privacy. Your feedback helps us improve TrackMyFlight. 
+                      Your information will never be shared with third parties.
+                    </p>
+                  </div>
+
+                  {/* Submit Message */}
+                  {submitMessage && (
+                    <div className={`text-center p-3 rounded-lg ${
+                      submitMessage.includes('Thank you') 
+                        ? 'bg-green-500/20 text-green-100 border border-green-500/30' 
+                        : 'bg-red-500/20 text-red-100 border border-red-500/30'
+                    }`}>
+                      {submitMessage}
+                    </div>
+                  )}
+
+                  {/* Action Buttons */}
+                  <div className="flex gap-3 pt-2">
+                    <button
+                      type="button"
+                      onClick={() => setShowFeedbackModal(false)}
+                      className="flex-1 px-4 py-3 bg-white/10 hover:bg-white/20 text-white font-medium rounded-lg transition-colors border border-white/20"
+                    >
+                      Cancel
+                    </button>
+                    <button
+                      type="submit"
+                      disabled={isSubmitting}
+                      className="flex-1 px-4 py-3 bg-gradient-to-r from-blue-500 to-cyan-500 hover:from-blue-600 hover:to-cyan-600 text-white font-medium rounded-lg transition-all transform hover:scale-105 disabled:opacity-50 disabled:cursor-not-allowed disabled:transform-none"
+                    >
+                      {isSubmitting ? 'Sending...' : 'Submit'}
+                    </button>
+                  </div>
+                </form>
+              </div>
+            </div>
+          </div>
+        )}
       </div>
     </div>
   )

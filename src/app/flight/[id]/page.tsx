@@ -28,7 +28,155 @@ const extractFlightNumber = (flightId: string): string => {
   return parts[0] || flightId
 }
 
+// Helper function to convert times to user's local timezone
+const convertToLocalTime = (time: string, timezone: string, date?: string): string => {
+  try {
+    // Parse the time (e.g., "11:40")
+    const [hours, minutes] = time.split(':').map(Number);
+    
+    // Use provided date or today
+    const today = new Date();
+    let dateObj = today;
+    
+    if (date) {
+      // Parse date like "15 Oct 2025"
+      const [day, monthStr, year] = date.split(' ');
+      const monthMap: Record<string, number> = {
+        'Jan': 0, 'Feb': 1, 'Mar': 2, 'Apr': 3, 'May': 4, 'Jun': 5,
+        'Jul': 6, 'Aug': 7, 'Sep': 8, 'Oct': 9, 'Nov': 10, 'Dec': 11
+      };
+      const monthNum = monthMap[monthStr] ?? today.getMonth();
+      dateObj = new Date(parseInt(year), monthNum, parseInt(day), hours, minutes);
+    } else {
+      dateObj = new Date(today.getFullYear(), today.getMonth(), today.getDate(), hours, minutes);
+    }
+    
+    // Timezone offset mapping (hours from UTC)
+    const timezoneOffsets: Record<string, number> = {
+      'GMT': 0, 'BST': 1, 'UTC': 0,
+      'WEST': 1, 'WET': 0, // Western European Summer/Winter Time
+      'CEST': 2, 'CET': 1, // Central European Summer/Standard Time
+      'EEST': 3, 'EET': 2, // Eastern European Summer/Standard Time
+      'PST': -8, 'PDT': -7, // Pacific
+      'MST': -7, 'MDT': -6, // Mountain
+      'CST': -6, 'CDT': -5, // Central
+      'EST': -5, 'EDT': -4, // Eastern
+    };
+    
+    const tzOffset = timezoneOffsets[timezone] ?? 0;
+    
+    // Convert to UTC first
+    const utcTime = new Date(dateObj.getTime() - (tzOffset * 60 * 60 * 1000));
+    
+    // Browser will automatically convert UTC to user's local timezone
+    return utcTime.toLocaleTimeString(undefined, { 
+      hour: '2-digit', 
+      minute: '2-digit',
+      hour12: false 
+    });
+  } catch (e) {
+    console.error('Time conversion error:', e);
+    return time; // Return original if conversion fails
+  }
+}
+
+// Get user's timezone abbreviation
+const getUserTimezone = (): string => {
+  try {
+    const formatter = new Intl.DateTimeFormat(undefined, { timeZoneName: 'short' });
+    const parts = formatter.formatToParts(new Date());
+    const timeZonePart = parts.find(part => part.type === 'timeZoneName');
+    return timeZonePart?.value ?? 'Local';
+  } catch (e) {
+    return 'Local';
+  }
+}
+
+// Calculate distance between two coordinates (Haversine formula)
+const calculateDistance = (lat1: number, lon1: number, lat2: number, lon2: number): number => {
+  const R = 6371; // Earth's radius in km
+  const dLat = (lat2 - lat1) * Math.PI / 180;
+  const dLon = (lon2 - lon1) * Math.PI / 180;
+  const a = 
+    Math.sin(dLat / 2) * Math.sin(dLat / 2) +
+    Math.cos(lat1 * Math.PI / 180) * Math.cos(lat2 * Math.PI / 180) *
+    Math.sin(dLon / 2) * Math.sin(dLon / 2);
+  const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+  return R * c; // Distance in km
+}
+
+// Calculate estimated arrival and delay
+const calculateFlightStatus = (
+  currentPosition: any,
+  destination: any,
+  scheduledArrival?: { time: string; timezone: string; date?: string }
+) => {
+  if (!currentPosition || !destination || !scheduledArrival) {
+    return null;
+  }
+  
+  // Calculate remaining distance
+  const distanceKm = calculateDistance(
+    currentPosition.latitude,
+    currentPosition.longitude,
+    destination.latitude,
+    destination.longitude
+  );
+  
+  // Convert speed from knots to km/h
+  const speedKmh = currentPosition.speed * 1.852;
+  
+  if (speedKmh < 50) {
+    // Aircraft is on ground or moving very slowly
+    return { status: 'landed', distanceKm, estimatedMinutesRemaining: 0, delayMinutes: 0 };
+  }
+  
+  // Calculate estimated time remaining (in hours)
+  const hoursRemaining = distanceKm / speedKmh;
+  const minutesRemaining = Math.round(hoursRemaining * 60);
+  
+  // Parse scheduled arrival time
+  try {
+    const [hours, minutes] = scheduledArrival.time.split(':').map(Number);
+    const dateStr = scheduledArrival.date || new Date().toLocaleDateString('en-GB');
+    const [day, monthStr, year] = dateStr.split(' ');
+    const monthMap: Record<string, number> = {
+      'Jan': 0, 'Feb': 1, 'Mar': 2, 'Apr': 3, 'May': 4, 'Jun': 5,
+      'Jul': 6, 'Aug': 7, 'Sep': 8, 'Oct': 9, 'Nov': 10, 'Dec': 11
+    };
+    const monthNum = monthMap[monthStr] ?? new Date().getMonth();
+    const scheduledTime = new Date(parseInt(year), monthNum, parseInt(day), hours, minutes);
+    
+    // Calculate estimated arrival
+    const estimatedArrival = new Date(Date.now() + minutesRemaining * 60 * 1000);
+    
+    // Calculate delay in minutes
+    const delayMinutes = Math.round((estimatedArrival.getTime() - scheduledTime.getTime()) / (60 * 1000));
+    
+    return {
+      status: delayMinutes > 15 ? 'delayed' : delayMinutes < -15 ? 'early' : 'on-time',
+      distanceKm: Math.round(distanceKm),
+      estimatedMinutesRemaining: minutesRemaining,
+      delayMinutes,
+      estimatedArrival: estimatedArrival.toLocaleTimeString(undefined, { 
+        hour: '2-digit', 
+        minute: '2-digit',
+        hour12: false 
+      })
+    };
+  } catch (e) {
+    return { status: 'unknown', distanceKm: Math.round(distanceKm), estimatedMinutesRemaining: minutesRemaining };
+  }
+}
+
 const transformFlightData = (apiData: any): ExtendedFlight => {
+  // Debug logging
+  console.log('🔍 Raw API Data:', apiData);
+  console.log('📅 Date field:', apiData.date);
+  console.log('🛫 Departure field:', apiData.departure);
+  console.log('🛬 Arrival field:', apiData.arrival);
+  console.log('📦 Enriched Data:', apiData.enrichedData);
+  
   const now = new Date();
   
   const originCode = apiData.origin?.code || apiData.departure?.iata || 'UNK';
@@ -44,7 +192,7 @@ const transformFlightData = (apiData: any): ExtendedFlight => {
     },
     origin: {
       code: originCode,
-      name: apiData.origin?.name || apiData.departure?.airport || 'Unknown Airport',
+      name: apiData.origin?.airport || apiData.origin?.name || apiData.departure?.airport || 'Unknown Airport',
       city: apiData.origin?.city || 'Unknown City',
       country: apiData.origin?.country || 'Unknown Country',
       latitude: apiData.origin?.latitude || 0,
@@ -53,7 +201,7 @@ const transformFlightData = (apiData: any): ExtendedFlight => {
     },
     destination: {
       code: destCode,
-      name: apiData.destination?.name || apiData.arrival?.airport || 'Unknown Airport',
+      name: apiData.destination?.airport || apiData.destination?.name || apiData.arrival?.airport || 'Unknown Airport',
       city: apiData.destination?.city || 'Unknown City',
       country: apiData.destination?.country || 'Unknown Country',
       latitude: apiData.destination?.latitude || 0,
@@ -96,10 +244,52 @@ const transformFlightData = (apiData: any): ExtendedFlight => {
     updatedAt: apiData.updatedAt ? new Date(apiData.updatedAt) : now,
   };
 
-  return {
+  // Create extended flight with additional fields from API
+  const extendedFlight: any = {
     ...baseFlight,
     live: apiData.live,
   };
+
+  // Pass through departure/arrival times if they exist directly
+  if (apiData.departure) {
+    extendedFlight.departure = apiData.departure;
+    console.log('✅ Added departure to extended flight:', extendedFlight.departure);
+  } 
+  // Otherwise try to get from enrichedData
+  else if (apiData.enrichedData?.departure) {
+    extendedFlight.departure = apiData.enrichedData.departure;
+    console.log('✅ Added departure from enrichedData:', extendedFlight.departure);
+  } else {
+    console.log('❌ No departure data in API response');
+  }
+  
+  if (apiData.arrival) {
+    extendedFlight.arrival = apiData.arrival;
+    console.log('✅ Added arrival to extended flight:', extendedFlight.arrival);
+  }
+  // Otherwise try to get from enrichedData
+  else if (apiData.enrichedData?.arrival) {
+    extendedFlight.arrival = apiData.enrichedData.arrival;
+    console.log('✅ Added arrival from enrichedData:', extendedFlight.arrival);
+  } else {
+    console.log('❌ No arrival data in API response');
+  }
+  
+  if (apiData.date) {
+    extendedFlight.date = apiData.date;
+    console.log('✅ Added date to extended flight:', extendedFlight.date);
+  }
+  // Otherwise try to get from enrichedData
+  else if (apiData.enrichedData?.date) {
+    extendedFlight.date = apiData.enrichedData.date;
+    console.log('✅ Added date from enrichedData:', extendedFlight.date);
+  } else {
+    console.log('❌ No date in API response');
+  }
+
+  console.log('🎯 Final extended flight object:', extendedFlight);
+
+  return extendedFlight;
 }
 
 // Global cache to prevent duplicate requests
@@ -111,14 +301,20 @@ export default function FlightDetailPage({ params }: { params: { id: string } })
   const [flight, setFlight] = useState<ExtendedFlight | null>(null)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
+  const [userTimezone, setUserTimezone] = useState<string>('Local')
   const router = useRouter()
   
   const hasMountedRef = useRef(false);
 
+  // Get user's timezone on mount
+  useEffect(() => {
+    setUserTimezone(getUserTimezone());
+  }, []);
+
   useEffect(() => {
     // Prevent double execution in React StrictMode
     if (hasMountedRef.current) {
-      console.log('⏭️ Already mounted, skipping');
+      console.log('⭐️ Already mounted, skipping');
       return;
     }
     hasMountedRef.current = true;
@@ -127,13 +323,19 @@ export default function FlightDetailPage({ params }: { params: { id: string } })
       const flightNumber = extractFlightNumber(params.id);
       const cacheKey = flightNumber;
 
-      // Check cache first
-      const cached = flightCache.get(cacheKey);
-      if (cached && Date.now() - cached.timestamp < CACHE_DURATION) {
-        console.log('📦 Using cached flight data');
-        setFlight(cached.data);
-        setLoading(false);
-        return;
+      // Try sessionStorage first
+      try {
+        const stored = sessionStorage.getItem(`flight_${params.id}`)
+        if (stored) {
+          console.log('📦 Using sessionStorage data');
+          const storedFlight = JSON.parse(stored);
+          const transformed = transformFlightData(storedFlight);
+          setFlight(transformed);
+          setLoading(false);
+          return;
+        }
+      } catch (e) {
+        console.warn('Failed to load from sessionStorage:', e);
       }
 
       // Check if request is already in progress
@@ -337,64 +539,81 @@ export default function FlightDetailPage({ params }: { params: { id: string } })
                 <div className="text-4xl">✈️</div>
                 <div>
                   <h2 className="text-3xl font-bold text-white">{flight.flightNumber}</h2>
-                  <p className="text-blue-200">{flight.airline.name}</p>
+                  <p className="text-blue-200">{flight.airline.name}</p>  
                   {flight.callsign && flight.callsign !== flight.flightNumber && (
                     <p className="text-sm text-blue-300">Callsign: {flight.callsign}</p>
                   )}
                 </div>
               </div>
               <span className={`inline-block px-3 py-1 rounded-full text-sm font-medium ${
-                flight.status.status === 'departed' ? 'bg-green-500/30 text-green-300' :
+                flight.status.status === 'departed' || (flight.live && flight.live.lat) ? 'bg-green-500/30 text-green-300' :
                 flight.status.status === 'arrived' ? 'bg-blue-500/30 text-blue-300' :
                 flight.status.status === 'delayed' ? 'bg-orange-500/30 text-orange-300' :
                 flight.status.status === 'cancelled' ? 'bg-red-500/30 text-red-300' :
                 'bg-gray-500/30 text-gray-300'
               }`}>
-                {flight.status.status.charAt(0).toUpperCase() + flight.status.status.slice(1)}
+                {flight.live && flight.live.lat ? 'In Flight' : flight.status.status.charAt(0).toUpperCase() + flight.status.status.slice(1)}
               </span>
             </div>
 
             <div className="grid grid-cols-3 gap-4 items-center mb-8">
               <div className="text-center">
-                <div className="text-2xl font-bold text-white">{flight.origin.code}</div>
+                <div className="flex items-center justify-center gap-2 mb-2">
+                  {flight.origin.country && (
+                    <img 
+                      src={`https://flagcdn.com/32x24/${flight.origin.country.toLowerCase()}.png`}
+                      alt={flight.origin.country}
+                      className="inline-block w-8 h-6"
+                    />
+                  )}
+                  <div className="text-2xl font-bold text-white">{flight.origin.code}</div>
+                </div>
                 <div className="text-sm text-blue-200">{flight.origin.city}</div>
                 <div className="text-xs text-blue-300">{flight.origin.name}</div>
+                {(flight as any).departure && (
+                  <div className="mt-2 pt-2 border-t border-white/10">
+                    <div className="text-xs text-blue-300">Departure</div>
+                    <div className="text-sm font-semibold text-white">
+                      {(flight as any).departure.time} {(flight as any).departure.timezone}
+                    </div>
+                    <div className="text-xs text-blue-200">
+                      ({userTimezone}: {convertToLocalTime((flight as any).departure.time, (flight as any).departure.timezone, (flight as any).date)})
+                    </div>
+                  </div>
+                )}
               </div>
               <div className="text-center">
                 <div className="text-blue-400 text-2xl">→</div>
               </div>
               <div className="text-center">
-                <div className="text-2xl font-bold text-white">{flight.destination.code}</div>
+                <div className="flex items-center justify-center gap-2 mb-2">
+                  {flight.destination.country && (
+                    <img 
+                      src={`https://flagcdn.com/32x24/${flight.destination.country.toLowerCase()}.png`}
+                      alt={flight.destination.country}
+                      className="inline-block w-8 h-6"
+                    />
+                  )}
+                  <div className="text-2xl font-bold text-white">{flight.destination.code}</div>
+                </div>
                 <div className="text-sm text-blue-200">{flight.destination.city}</div>
                 <div className="text-xs text-blue-300">{flight.destination.name}</div>
+                {(flight as any).arrival && (
+                  <div className="mt-2 pt-2 border-t border-white/10">
+                    <div className="text-xs text-blue-300">Scheduled Arrival</div>
+                    <div className="text-sm font-semibold text-white">
+                      {(flight as any).arrival.time} {(flight as any).arrival.timezone}
+                    </div>
+                    <div className="text-xs text-blue-200">
+                      ({userTimezone}: {convertToLocalTime((flight as any).arrival.time, (flight as any).arrival.timezone, (flight as any).date)})
+                    </div>
+                  </div>
+                )}
               </div>
             </div>
 
-            {flight.status.scheduled && (
-              <div className="grid grid-cols-2 gap-6 mb-6">
-                <div className="bg-white/5 rounded-lg p-4 border border-white/10">
-                  <h3 className="text-sm font-medium text-blue-200 mb-2">Departure</h3>
-                  <div className="text-xl font-bold text-white">
-                    {formatTime(flight.status.scheduled.departure)}
-                  </div>
-                  <div className="text-sm text-blue-200">
-                    {formatDate(flight.status.scheduled.departure)}
-                  </div>
-                </div>
-                <div className="bg-white/5 rounded-lg p-4 border border-white/10">
-                  <h3 className="text-sm font-medium text-blue-200 mb-2">Arrival</h3>
-                  <div className="text-xl font-bold text-white">
-                    {formatTime(flight.status.scheduled.arrival)}
-                  </div>
-                  <div className="text-sm text-blue-200">
-                    {formatDate(flight.status.scheduled.arrival)}
-                  </div>
-                </div>
-              </div>
-            )}
-
             {flight.currentPosition && (
-              <div className="bg-white/5 rounded-lg p-4 border border-white/10">
+              <div className="bg-white/5 rounded-lg p-4 border border-white/10 mb-4">
                 <h3 className="text-sm font-medium text-blue-200 mb-3">Current Position</h3>
                 <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
                   <div>
@@ -424,6 +643,66 @@ export default function FlightDetailPage({ params }: { params: { id: string } })
                 </div>
               </div>
             )}
+
+            {/* Flight Progress & ETA */}
+            {flight.currentPosition && (flight as any).arrival && (() => {
+              const flightStatus = calculateFlightStatus(
+                flight.currentPosition,
+                flight.destination,
+                {
+                  time: (flight as any).arrival.time,
+                  timezone: (flight as any).arrival.timezone,
+                  date: (flight as any).date
+                }
+              );
+              
+              if (!flightStatus) return null;
+              
+              return (
+                <div className="bg-white/5 rounded-lg p-4 border border-white/10">
+                  <h3 className="text-sm font-medium text-blue-200 mb-3">Flight Progress</h3>
+                  <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+                    <div>
+                      <div className="text-xs text-blue-300">Distance Remaining</div>
+                      <div className="text-lg font-bold text-white">
+                        {flightStatus.distanceKm} km
+                      </div>
+                      <div className="text-xs text-blue-200">
+                        ({Math.round(flightStatus.distanceKm * 0.621371)} mi)
+                      </div>
+                    </div>
+                    <div>
+                      <div className="text-xs text-blue-300">Time Remaining</div>
+                      <div className="text-lg font-bold text-white">
+                        {Math.floor(flightStatus.estimatedMinutesRemaining / 60)}h {flightStatus.estimatedMinutesRemaining % 60}m
+                      </div>
+                    </div>
+                    <div>
+                      <div className="text-xs text-blue-300">Estimated Arrival (Local)</div>
+                      <div className="text-lg font-bold text-white">
+                        {flightStatus.estimatedArrival || 'Calculating...'}
+                      </div>
+                    </div>
+                    <div>
+                      <div className="text-xs text-blue-300">Status</div>
+                      <div className={`text-lg font-bold ${
+                        flightStatus.status === 'on-time' ? 'text-green-400' :
+                        flightStatus.status === 'early' ? 'text-blue-400' :
+                        flightStatus.status === 'delayed' ? 'text-orange-400' :
+                        flightStatus.status === 'landed' ? 'text-purple-400' :
+                        'text-gray-400'
+                      }`}>
+                        {flightStatus.status === 'on-time' && '✓ On Time'}
+                        {flightStatus.status === 'early' && `↑ Early ${Math.abs(flightStatus.delayMinutes ?? 0)}m`}
+                        {flightStatus.status === 'delayed' && `↓ Delayed ${flightStatus.delayMinutes ?? 0}m`}
+                        {flightStatus.status === 'landed' && '🛬 Landed'}
+                        {flightStatus.status === 'unknown' && 'Calculating...'}
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              );
+            })()}
           </div>
 
           {flight.currentPosition && (
@@ -447,6 +726,12 @@ export default function FlightDetailPage({ params }: { params: { id: string } })
                   <div className="bg-white/5 rounded-lg p-3 border border-white/10">
                     <div className="text-xs text-blue-300">Registration</div>
                     <div className="text-sm font-medium text-white">{flight.aircraft.registration}</div>
+                  </div>
+                )}
+                {flight.aircraft.model && (
+                  <div className="bg-white/5 rounded-lg p-3 border border-white/10">
+                    <div className="text-xs text-blue-300">Model</div>
+                    <div className="text-sm font-medium text-white">{flight.aircraft.model}</div>
                   </div>
                 )}
               </div>

@@ -60,6 +60,9 @@ function inferAirlineFromPrefix(q: string) {
   if (prefix === 'EZY' || prefix === 'U2') {
     return { code: prefix === 'EZY' ? 'EZY' : 'U2', name: 'easyJet' }
   }
+  if (prefix === 'EJU') {
+    return { code: 'EJU', name: 'easyJet Europe' }
+  }
   if (prefix === 'RYR' || prefix === 'FR') {
     return { code: prefix === 'RYR' ? 'RYR' : 'FR', name: 'Ryanair' }
   }
@@ -312,33 +315,49 @@ export async function GET(req: NextRequest) {
       try {
         const enrichedFlight = await planeFinderScraper.enrichFlightData(liveFlight)
         
-        // Add enrichedTiming for the UI if we have the data
-        if (enrichedFlight.origin?.scheduledTime && enrichedFlight.destination?.scheduledTime) {
-          enrichedFlight.enrichedTiming = {
-            departure: {
-              time: enrichedFlight.origin.scheduledTime,
-              timezone: enrichedFlight.origin.timezone || ''
-            },
-            arrival: {
-              time: enrichedFlight.destination.scheduledTime,
-              timezone: enrichedFlight.destination.timezone || ''
-            }
-          }
+        // Extract departure/arrival times from scheduledTime fields
+        const departure = enrichedFlight.origin?.scheduledTime && enrichedFlight.origin?.timezone ? {
+          time: enrichedFlight.origin.scheduledTime,
+          timezone: enrichedFlight.origin.timezone
+        } : undefined
+        
+        const arrival = enrichedFlight.destination?.scheduledTime && enrichedFlight.destination?.timezone ? {
+          time: enrichedFlight.destination.scheduledTime,
+          timezone: enrichedFlight.destination.timezone
+        } : undefined
+        
+        const date = enrichedFlight.enrichedData?.date
+        
+        // Add departure/arrival/date to top level for easier access
+        const finalFlight = {
+          ...enrichedFlight,
+          departure,
+          arrival,
+          date,
+          // Also add enrichedTiming for backward compatibility
+          enrichedTiming: departure && arrival ? {
+            departure,
+            arrival
+          } : undefined
         }
         
-        liveResults.push(enrichedFlight)
+        liveResults.push(finalFlight)
         console.log(`✅ Enhanced with PlaneFinder data: ${cs}`)
-        console.log(`   Origin: ${enrichedFlight.origin.code} ${enrichedFlight.origin.flag || '(no flag)'} ${enrichedFlight.origin.city}`)
-        console.log(`   Dest: ${enrichedFlight.destination.code} ${enrichedFlight.destination.flag || '(no flag)'} ${enrichedFlight.destination.city}`)
+        console.log(`   Origin: ${finalFlight.origin.code} ${finalFlight.origin.flag || '(no flag)'} ${finalFlight.origin.city}`)
+        console.log(`   Dest: ${finalFlight.destination.code} ${finalFlight.destination.flag || '(no flag)'} ${finalFlight.destination.city}`)
+        console.log(`   Departure: ${departure?.time} ${departure?.timezone}`)
+        console.log(`   Arrival: ${arrival?.time} ${arrival?.timezone}`)
+        console.log(`   Date: ${date}`)
         
         if (debugFlag) {
           debugInfo.sources.push({
             callsign: cs,
             liveSource: (live as any).source,
             planeFinderEnriched: true,
-            hasFlag: !!(enrichedFlight.origin.flag && enrichedFlight.destination.flag),
-            originFlag: enrichedFlight.origin.flag,
-            destFlag: enrichedFlight.destination.flag
+            hasFlag: !!(finalFlight.origin.flag && finalFlight.destination.flag),
+            hasTiming: !!(departure && arrival),
+            originFlag: finalFlight.origin.flag,
+            destFlag: finalFlight.destination.flag
           })
         }
       } catch (error) {

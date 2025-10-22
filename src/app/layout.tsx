@@ -49,6 +49,10 @@ export default function RootLayout({
           href='https://api.mapbox.com/mapbox-gl-js/v3.0.1/mapbox-gl.css' 
           rel='stylesheet' 
         />
+        <link
+          rel="stylesheet"
+          href="https://cdn.jsdelivr.net/npm/cesium@1.111/Build/Cesium/Widgets/widgets.css"
+        />
       </head>
       <body
         className={`${inter.variable} font-sans antialiased bg-background text-foreground`}

@@ -1,11 +1,13 @@
 //flight/[id]/page.tsx
 'use client'
 
-import { FlightTracker } from '@/components/FlightTracker'
-import { Flight } from '@/types/flight'
-import Image from 'next/image'
-import { useRouter } from 'next/navigation'
-import { useEffect, useRef, useState } from 'react'
+import { CockpitView } from '@/components/CockpitView';
+import { FlightTracker } from '@/components/FlightTracker';
+import { useFlightPosition } from '@/hooks/useFlightPosition';
+import { Flight } from '@/types/flight';
+import Image from 'next/image';
+import { useRouter } from 'next/navigation';
+import { useEffect, useRef, useState } from 'react';
 
 interface ExtendedFlight extends Flight {
   live?: {
@@ -28,31 +30,23 @@ const extractFlightNumber = (flightId: string): string => {
   return parts[0] || flightId
 }
 
-// Helper function to convert times to user's local timezone
-// Helper function to convert times to user's local timezone
 const convertToLocalTime = (time: string, timezone: string, date?: string): string => {
   try {
-    console.log(`🔄 Converting time: ${time} ${timezone} (date: ${date})`);
-    
-    // Parse the time (e.g., "20:45")
     const [hours, minutes] = time.split(':').map(Number);
     
-    // Timezone offset mapping (hours from UTC)
     const timezoneOffsets: Record<string, number> = {
       'GMT': 0, 'BST': 1, 'UTC': 0,
-      'WEST': 1, 'WET': 0, // Western European Summer/Winter Time
-      'CEST': 2, 'CET': 1, // Central European Summer/Standard Time
-      'EEST': 3, 'EET': 2, // Eastern European Summer/Standard Time
-      'PST': -8, 'PDT': -7, // Pacific
-      'MST': -7, 'MDT': -6, // Mountain
-      'CST': -6, 'CDT': -5, // Central
-      'EST': -5, 'EDT': -4, // Eastern
+      'WEST': 1, 'WET': 0,
+      'CEST': 2, 'CET': 1,
+      'EEST': 3, 'EET': 2,
+      'PST': -8, 'PDT': -7,
+      'MST': -7, 'MDT': -6,
+      'CST': -6, 'CDT': -5,
+      'EST': -5, 'EDT': -4,
     };
     
     const tzOffset = timezoneOffsets[timezone] ?? 0;
-    console.log(`🌍 Timezone ${timezone} offset: UTC+${tzOffset}`);
     
-    // Parse the date
     let year, month, day;
     if (date) {
       const [dayStr, monthStr, yearStr] = date.split(' ');
@@ -70,29 +64,22 @@ const convertToLocalTime = (time: string, timezone: string, date?: string): stri
       day = today.getDate();
     }
     
-    // Create UTC date by using Date.UTC (this creates a timestamp in UTC)
-    // Subtract the timezone offset to get the actual UTC time
     const utcTimestamp = Date.UTC(year, month, day, hours, minutes) - (tzOffset * 60 * 60 * 1000);
     const utcDate = new Date(utcTimestamp);
     
-    console.log(`🌐 UTC time: ${utcDate.toISOString()}`);
-    
-    // Now convert to local timezone (browser does this automatically)
     const localTime = utcDate.toLocaleTimeString(undefined, { 
       hour: '2-digit', 
       minute: '2-digit',
       hour12: false 
     });
     
-    console.log(`✅ Final local time: ${localTime}`);
     return localTime;
   } catch (e) {
     console.error('Time conversion error:', e);
-    return time; // Return original if conversion fails
+    return time;
   }
 }
 
-// Get user's timezone abbreviation
 const getUserTimezone = (): string => {
   try {
     const formatter = new Intl.DateTimeFormat(undefined, { timeZoneName: 'short' });
@@ -104,9 +91,8 @@ const getUserTimezone = (): string => {
   }
 }
 
-// Calculate distance between two coordinates (Haversine formula)
 const calculateDistance = (lat1: number, lon1: number, lat2: number, lon2: number): number => {
-  const R = 6371; // Earth's radius in km
+  const R = 6371;
   const dLat = (lat2 - lat1) * Math.PI / 180;
   const dLon = (lon2 - lon1) * Math.PI / 180;
   const a = 
@@ -114,10 +100,9 @@ const calculateDistance = (lat1: number, lon1: number, lat2: number, lon2: numbe
     Math.cos(lat1 * Math.PI / 180) * Math.cos(lat2 * Math.PI / 180) *
     Math.sin(dLon / 2) * Math.sin(dLon / 2);
   const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
-  return R * c; // Distance in km
+  return R * c;
 }
 
-// Calculate estimated arrival and delay
 const calculateFlightStatus = (
   currentPosition: any,
   destination: any,
@@ -127,7 +112,6 @@ const calculateFlightStatus = (
     return null;
   }
   
-  // Calculate remaining distance
   const distanceKm = calculateDistance(
     currentPosition.latitude,
     currentPosition.longitude,
@@ -135,19 +119,15 @@ const calculateFlightStatus = (
     destination.longitude
   );
   
-  // Convert speed from knots to km/h
   const speedKmh = currentPosition.speed * 1.852;
   
   if (speedKmh < 50) {
-    // Aircraft is on ground or moving very slowly
     return { status: 'landed', distanceKm, estimatedMinutesRemaining: 0, delayMinutes: 0 };
   }
   
-  // Calculate estimated time remaining (in hours)
   const hoursRemaining = distanceKm / speedKmh;
   const minutesRemaining = Math.round(hoursRemaining * 60);
   
-  // Parse scheduled arrival time
   try {
     const [hours, minutes] = scheduledArrival.time.split(':').map(Number);
     const dateStr = scheduledArrival.date || new Date().toLocaleDateString('en-GB');
@@ -159,10 +139,8 @@ const calculateFlightStatus = (
     const monthNum = monthMap[monthStr] ?? new Date().getMonth();
     const scheduledTime = new Date(parseInt(year), monthNum, parseInt(day), hours, minutes);
     
-    // Calculate estimated arrival
     const estimatedArrival = new Date(Date.now() + minutesRemaining * 60 * 1000);
     
-    // Calculate delay in minutes
     const delayMinutes = Math.round((estimatedArrival.getTime() - scheduledTime.getTime()) / (60 * 1000));
     
     return {
@@ -182,13 +160,6 @@ const calculateFlightStatus = (
 }
 
 const transformFlightData = (apiData: any): ExtendedFlight => {
-  // Debug logging
-  console.log('🔍 Raw API Data:', apiData);
-  console.log('📅 Date field:', apiData.date);
-  console.log('🛫 Departure field:', apiData.departure);
-  console.log('🛬 Arrival field:', apiData.arrival);
-  console.log('📦 Enriched Data:', apiData.enrichedData);
-  
   const now = new Date();
   
   const originCode = apiData.origin?.code || apiData.departure?.iata || 'UNK';
@@ -256,58 +227,35 @@ const transformFlightData = (apiData: any): ExtendedFlight => {
     updatedAt: apiData.updatedAt ? new Date(apiData.updatedAt) : now,
   };
 
-  // Create extended flight with additional fields from API
   const extendedFlight: any = {
     ...baseFlight,
     live: apiData.live,
   };
 
-  // Pass through departure/arrival times if they exist directly
   if (apiData.departure) {
     extendedFlight.departure = apiData.departure;
-    console.log('✅ Added departure to extended flight:', extendedFlight.departure);
-  } 
-  // Otherwise try to get from enrichedData
-  else if (apiData.enrichedData?.departure) {
+  } else if (apiData.enrichedData?.departure) {
     extendedFlight.departure = apiData.enrichedData.departure;
-    console.log('✅ Added departure from enrichedData:', extendedFlight.departure);
-  } else {
-    console.log('❌ No departure data in API response');
   }
   
   if (apiData.arrival) {
     extendedFlight.arrival = apiData.arrival;
-    console.log('✅ Added arrival to extended flight:', extendedFlight.arrival);
-  }
-  // Otherwise try to get from enrichedData
-  else if (apiData.enrichedData?.arrival) {
+  } else if (apiData.enrichedData?.arrival) {
     extendedFlight.arrival = apiData.enrichedData.arrival;
-    console.log('✅ Added arrival from enrichedData:', extendedFlight.arrival);
-  } else {
-    console.log('❌ No arrival data in API response');
   }
   
   if (apiData.date) {
     extendedFlight.date = apiData.date;
-    console.log('✅ Added date to extended flight:', extendedFlight.date);
-  }
-  // Otherwise try to get from enrichedData
-  else if (apiData.enrichedData?.date) {
+  } else if (apiData.enrichedData?.date) {
     extendedFlight.date = apiData.enrichedData.date;
-    console.log('✅ Added date from enrichedData:', extendedFlight.date);
-  } else {
-    console.log('❌ No date in API response');
   }
-
-  console.log('🎯 Final extended flight object:', extendedFlight);
 
   return extendedFlight;
 }
 
-// Global cache to prevent duplicate requests
 const flightCache = new Map<string, { data: ExtendedFlight; timestamp: number }>();
 const pendingRequests = new Map<string, Promise<ExtendedFlight | null>>();
-const CACHE_DURATION = 30000; // 30 seconds
+const CACHE_DURATION = 30000;
 
 export default function FlightDetailPage({ params }: { params: { id: string } }) {
   const [flight, setFlight] = useState<ExtendedFlight | null>(null)
@@ -320,15 +268,25 @@ export default function FlightDetailPage({ params }: { params: { id: string } })
   
   const hasMountedRef = useRef(false);
 
-  // Get user's timezone on mount
+  // Use shared flight position hook
+  const { 
+    currentPosition, 
+    interpolatedPosition, 
+    lastUpdateTime,
+    isTracking,
+    setIsTracking 
+  } = useFlightPosition({
+    flightNumber: flight?.flightNumber || '',
+    initialPosition: flight?.currentPosition || null,
+    isTracking: true,
+  });
+
   useEffect(() => {
     setUserTimezone(getUserTimezone());
   }, []);
 
   useEffect(() => {
-    // Prevent double execution in React StrictMode
     if (hasMountedRef.current) {
-      console.log('⭐️ Already mounted, skipping');
       return;
     }
     hasMountedRef.current = true;
@@ -337,11 +295,9 @@ export default function FlightDetailPage({ params }: { params: { id: string } })
       const flightNumber = extractFlightNumber(params.id);
       const cacheKey = flightNumber;
 
-      // Try sessionStorage first
       try {
         const stored = sessionStorage.getItem(`flight_${params.id}`)
         if (stored) {
-          console.log('📦 Using sessionStorage data');
           const storedFlight = JSON.parse(stored);
           const transformed = transformFlightData(storedFlight);
           setFlight(transformed);
@@ -352,9 +308,7 @@ export default function FlightDetailPage({ params }: { params: { id: string } })
         console.warn('Failed to load from sessionStorage:', e);
       }
 
-      // Check if request is already in progress
       if (pendingRequests.has(cacheKey)) {
-        console.log('⏳ Request already in progress, waiting...');
         try {
           const result = await pendingRequests.get(cacheKey);
           if (result) {
@@ -369,10 +323,7 @@ export default function FlightDetailPage({ params }: { params: { id: string } })
         }
         return;
       }
-
-      console.log('🔄 Fetching flight details...');
       
-      // Create the request promise
       const requestPromise = (async (): Promise<ExtendedFlight | null> => {
         try {
           setLoading(true);
@@ -404,22 +355,19 @@ export default function FlightDetailPage({ params }: { params: { id: string } })
             throw new Error('Invalid flight data');
           }
 
-          // Cache the result
           flightCache.set(cacheKey, {
             data: transformed,
             timestamp: Date.now()
           });
 
-          console.log('✅ Flight loaded successfully');
           return transformed;
           
         } catch (err) {
-          console.error('❌ Fetch error:', err);
+          console.error('Fetch error:', err);
           throw err;
         }
       })();
 
-      // Store the pending request
       pendingRequests.set(cacheKey, requestPromise);
 
       try {
@@ -435,13 +383,11 @@ export default function FlightDetailPage({ params }: { params: { id: string } })
 
     fetchFlightDetails();
 
-    // Cleanup on unmount
     return () => {
       hasMountedRef.current = false;
     };
   }, [params.id]);
 
-  // Fetch aircraft photo when flight data is loaded
   useEffect(() => {
     if (flight?.aircraft?.registration) {
       const fetchAircraftPhoto = async () => {
@@ -451,7 +397,6 @@ export default function FlightDetailPage({ params }: { params: { id: string } })
           if (response.ok) {
             const data = await response.json();
             setAircraftPhoto(data.photo);
-            console.log('✅ Aircraft photo loaded:', data.photo);
           }
         } catch (error) {
           console.warn('Failed to load aircraft photo:', error);
@@ -464,28 +409,6 @@ export default function FlightDetailPage({ params }: { params: { id: string } })
   }, [flight?.aircraft?.registration]);
 
   const handleBack = () => router.push('/search')
-
-  const formatTime = (date: Date | string | undefined) => {
-    if (!date) return 'N/A'
-    const dateObj = typeof date === 'string' ? new Date(date) : date
-    if (isNaN(dateObj.getTime())) return 'N/A'
-    return new Intl.DateTimeFormat('en-US', {
-      hour: '2-digit',
-      minute: '2-digit',
-      hour12: true
-    }).format(dateObj)
-  }
-
-  const formatDate = (date: Date | string | undefined) => {
-    if (!date) return 'N/A'
-    const dateObj = typeof date === 'string' ? new Date(date) : date
-    if (isNaN(dateObj.getTime())) return 'N/A'
-    return new Intl.DateTimeFormat('en-US', {
-      weekday: 'short',
-      month: 'short',
-      day: 'numeric'
-    }).format(dateObj)
-  }
 
   if (loading) {
     return (
@@ -516,7 +439,8 @@ export default function FlightDetailPage({ params }: { params: { id: string } })
     )
   }
 
-  const isLiveOnly = !flight.status.scheduled
+  const isLiveOnly = !flight.status.scheduled;
+  const displayPosition = interpolatedPosition || currentPosition || flight.currentPosition;
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-slate-900 via-blue-900 to-slate-900">
@@ -569,7 +493,7 @@ export default function FlightDetailPage({ params }: { params: { id: string } })
             </div>
           )}
 
-          <div className="bg-white/10 backdrop-blur-md rounded-2xl shadow-2xl p-8 border border-white/20 mb-6 flight-data">
+          <div className="bg-white/10 backdrop-blur-md rounded-2xl shadow-2xl p-8 border border-white/20 mb-6">
             <div className="flex items-center justify-between mb-6">
               <div className="flex items-center gap-4">
                 <div className="text-4xl">✈️</div>
@@ -582,13 +506,13 @@ export default function FlightDetailPage({ params }: { params: { id: string } })
                 </div>
               </div>
               <span className={`inline-block px-3 py-1 rounded-full text-sm font-medium ${
-                flight.status.status === 'departed' || (flight.live && flight.live.lat) ? 'bg-green-500/30 text-green-300' :
+                flight.status.status === 'departed' || displayPosition ? 'bg-green-500/30 text-green-300' :
                 flight.status.status === 'arrived' ? 'bg-blue-500/30 text-blue-300' :
                 flight.status.status === 'delayed' ? 'bg-orange-500/30 text-orange-300' :
                 flight.status.status === 'cancelled' ? 'bg-red-500/30 text-red-300' :
                 'bg-gray-500/30 text-gray-300'
               }`}>
-                {flight.live && flight.live.lat ? 'In Flight' : flight.status.status.charAt(0).toUpperCase() + flight.status.status.slice(1)}
+                {displayPosition ? 'In Flight' : flight.status.status.charAt(0).toUpperCase() + flight.status.status.slice(1)}
               </span>
             </div>
 
@@ -613,11 +537,7 @@ export default function FlightDetailPage({ params }: { params: { id: string } })
                       {(flight as any).departure.time} {(flight as any).departure.timezone}
                     </div>
                     <div className="text-xs text-blue-200">
-                      ({userTimezone}: {(() => {
-                        const result = convertToLocalTime((flight as any).departure.time, (flight as any).departure.timezone, (flight as any).date);
-                        console.log('✅ Departure conversion result:', result);
-                        return result;
-                      })()})
+                      ({userTimezone}: {convertToLocalTime((flight as any).departure.time, (flight as any).departure.timezone, (flight as any).date)})
                     </div>
                   </div>
                 )}
@@ -645,53 +565,48 @@ export default function FlightDetailPage({ params }: { params: { id: string } })
                       {(flight as any).arrival.time} {(flight as any).arrival.timezone}
                     </div>
                     <div className="text-xs text-blue-200">
-                      ({userTimezone}: {(() => {
-                        const result = convertToLocalTime((flight as any).arrival.time, (flight as any).arrival.timezone, (flight as any).date);
-                        console.log('✅ Arrival conversion result:', result);
-                        return result;
-                      })()})
+                      ({userTimezone}: {convertToLocalTime((flight as any).arrival.time, (flight as any).arrival.timezone, (flight as any).date)})
                     </div>
                   </div>
                 )}
               </div>
             </div>
 
-            {flight.currentPosition && (
+            {displayPosition && (
               <div className="bg-white/5 rounded-lg p-4 border border-white/10 mb-4">
                 <h3 className="text-sm font-medium text-blue-200 mb-3">Current Position</h3>
                 <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
                   <div>
                     <div className="text-xs text-blue-300">Altitude</div>
                     <div className="text-lg font-bold text-white">
-                      {Math.round(flight.currentPosition.altitude).toLocaleString()}ft
+                      {Math.round(displayPosition.altitude).toLocaleString()}ft
                     </div>
                   </div>
                   <div>
                     <div className="text-xs text-blue-300">Speed</div>
                     <div className="text-lg font-bold text-white">
-                      {Math.round(flight.currentPosition.speed)}kts
+                      {Math.round(displayPosition.speed)}kts
                     </div>
                   </div>
                   <div>
                     <div className="text-xs text-blue-300">Heading</div>
                     <div className="text-lg font-bold text-white">
-                      {Math.round(flight.currentPosition.heading)}°
+                      {Math.round(displayPosition.heading)}°
                     </div>
                   </div>
                   <div>
                     <div className="text-xs text-blue-300">Position</div>
                     <div className="text-sm font-bold text-white">
-                      {flight.currentPosition.latitude.toFixed(2)}, {flight.currentPosition.longitude.toFixed(2)}
+                      {displayPosition.latitude.toFixed(2)}, {displayPosition.longitude.toFixed(2)}
                     </div>
                   </div>
                 </div>
               </div>
             )}
 
-            {/* Flight Progress & ETA */}
-            {flight.currentPosition && (flight as any).arrival && (() => {
+            {displayPosition && (flight as any).arrival && (() => {
               const flightStatus = calculateFlightStatus(
-                flight.currentPosition,
+                displayPosition,
                 flight.destination,
                 {
                   time: (flight as any).arrival.time,
@@ -749,28 +664,48 @@ export default function FlightDetailPage({ params }: { params: { id: string } })
             })()}
           </div>
 
-          {flight.currentPosition && (
-            <div className="bg-white/10 backdrop-blur-md rounded-2xl shadow-2xl p-6 border border-white/20 mb-6">
-              <h3 className="text-xl font-bold text-white mb-4">Live Flight Tracking</h3>
-              <div className="relative h-96 rounded-lg overflow-hidden">
-                <FlightTracker
-                  flight={flight}
-                  showRoute={true}
-                  className="w-full h-full"
-                />
+          {displayPosition && (
+            <>
+              <div className="bg-white/10 backdrop-blur-md rounded-2xl shadow-2xl p-6 border border-white/20 mb-6">
+                <h3 className="text-xl font-bold text-white mb-4">Live Flight Tracking</h3>
+                <div className="relative h-96 rounded-lg overflow-hidden">
+                  <FlightTracker
+                    flight={flight}
+                    currentPosition={currentPosition}
+                    interpolatedPosition={interpolatedPosition}
+                    isTracking={isTracking}
+                    onTrackingChange={setIsTracking}
+                    showRoute={true}
+                    className="w-full h-full"
+                  />
+                </div>
               </div>
-            </div>
+
+              <div className="bg-white/10 backdrop-blur-md rounded-2xl shadow-2xl p-6 border border-white/20 mb-6">
+                <h3 className="text-xl font-bold text-white mb-4">
+                  🛩️ Cockpit View - First Person Perspective
+                </h3>
+                <div className="relative h-[600px] rounded-lg overflow-hidden">
+                  <CockpitView
+                    flight={flight}
+                    interpolatedPosition={interpolatedPosition}
+                    className="w-full h-full"
+                  />
+                </div>
+                <p className="text-xs text-blue-200 mt-2 text-center">
+                  Real-time 3D view from the cockpit using actual terrain and satellite imagery
+                </p>
+              </div>
+            </>
           )}
 
           {flight.aircraft && (
             <div className="bg-white/10 backdrop-blur-md rounded-2xl shadow-2xl p-6 border border-white/20 mb-6">
               <h3 className="text-xl font-bold text-white mb-4">Aircraft Information</h3>
               
-              {/* Aircraft Photo with side-by-side layout */}
               {aircraftPhoto && (
                 <div className="mb-6 rounded-lg overflow-hidden border border-white/20">
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-0">
-                    {/* Image on left - smaller */}
                     <div className="relative">
                       <img 
                         src={aircraftPhoto.thumbnailUrl || aircraftPhoto.imageUrl} 
@@ -783,7 +718,6 @@ export default function FlightDetailPage({ params }: { params: { id: string } })
                       />
                     </div>
                     
-                    {/* Info on right */}
                     <div className="bg-white/5 p-4 flex flex-col justify-between">
                       <div className="space-y-3">
                         <div>

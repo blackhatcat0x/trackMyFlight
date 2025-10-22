@@ -514,5 +514,435 @@
       "scrapedAt": "2025-10-15T18:59:04.502Z"
     },
     "timestamp": 1760554744503
+  },
+  "EJU45ZU": {
+    "data": {
+      "flightNumber": "EJU45ZU",
+      "date": "15 Oct 2025",
+      "airline": {
+        "code": "EJU",
+        "name": "Unknown Airline"
+      },
+      "origin": {
+        "code": "LIS",
+        "airport": "Lisbon Humberto Delgado Airport",
+        "city": "Lisbon",
+        "country": "PT",
+        "flag": "🇵🇹",
+        "latitude": 38.7813,
+        "longitude": -9.13592
+      },
+      "destination": {
+        "code": "BCN",
+        "airport": "Josep Tarradellas Barcelona-El Prat Airport",
+        "city": "Barcelona",
+        "country": "ES",
+        "flag": "🇪🇸",
+        "latitude": 41.2971,
+        "longitude": 2.07846
+      },
+      "departure": {
+        "time": "20:55",
+        "timezone": "WEST"
+      },
+      "arrival": {
+        "time": "22:46",
+        "timezone": "CEST"
+      },
+      "aircraft": {
+        "model": "A319",
+        "registration": "OE-LKX"
+      },
+      "status": "unknown",
+      "scrapedAt": "2025-10-15T20:47:09.230Z"
+    },
+    "timestamp": 1760561229232
+  },
+  "EJU4294": {
+    "data": {
+      "flightNumber": "EJU4294",
+      "date": "18 Oct 2025",
+      "airline": {
+        "code": "EJU",
+        "name": "Unknown Airline"
+      },
+      "origin": {
+        "code": "BER",
+        "airport": "Berlin Brandenburg Airport",
+        "city": "Berlin",
+        "country": "DE",
+        "flag": "🇩🇪",
+        "latitude": 52.362247,
+        "longitude": 13.500672
+      },
+      "destination": {
+        "code": "NAP",
+        "airport": "Naples International Airport",
+        "city": "Napoli",
+        "country": "IT",
+        "flag": "🇮🇹",
+        "latitude": 40.886002,
+        "longitude": 14.2908
+      },
+      "departure": {
+        "time": "20:15",
+        "timezone": "CEST"
+      },
+      "arrival": {
+        "time": "21:32",
+        "timezone": "CEST"
+      },
+      "aircraft": {
+        "model": "A320",
+        "registration": "OE-ICI"
+      },
+      "status": "unknown",
+      "scrapedAt": "2025-10-18T19:33:03.743Z"
+    },
+    "timestamp": 1760815983744
+  },
+  "EZY21LH": {
+    "data": {
+      "flightNumber": "EZY21LH",
+      "date": "18 Oct 2025",
+      "airline": {
+        "code": "EZY",
+        "name": "easyJet"
+      },
+      "origin": {
+        "code": "ALC",
+        "airport": "Alicante-Elche Miguel Hernández Airport",
+        "city": "Alicante",
+        "country": "ES",
+        "flag": "🇪🇸",
+        "latitude": 38.2822,
+        "longitude": -0.558156
+      },
+      "destination": {
+        "code": "BHX",
+        "airport": "Birmingham Airport",
+        "city": "Birmingham, West Midlands",
+        "country": "GB",
+        "flag": "🇬🇧",
+        "latitude": 52.453899,
+        "longitude": -1.74803
+      },
+      "departure": {
+        "time": "21:35",
+        "timezone": "CEST"
+      },
+      "arrival": {
+        "time": "21:14",
+        "timezone": "BST"
+      },
+      "aircraft": {
+        "model": "A320",
+        "registration": "G-EZPE"
+      },
+      "status": "unknown",
+      "scrapedAt": "2025-10-18T20:14:36.909Z"
+    },
+    "timestamp": 1760818476910
+  },
+  "EZY65AZ": {
+    "data": {
+      "flightNumber": "EZY65AZ",
+      "date": "18 Oct 2025",
+      "airline": {
+        "code": "EZY",
+        "name": "easyJet"
+      },
+      "origin": {
+        "code": "VLC",
+        "airport": "Valencia Airport",
+        "city": "Valencia",
+        "country": "ES",
+        "flag": "🇪🇸",
+        "latitude": 39.4893,
+        "longitude": -0.481625
+      },
+      "destination": {
+        "code": "LGW",
+        "airport": "London Gatwick Airport",
+        "city": "London",
+        "country": "GB",
+        "flag": "🇬🇧",
+        "latitude": 51.148771,
+        "longitude": -0.192089
+      },
+      "departure": {
+        "time": "20:50",
+        "timezone": "CEST"
+      },
+      "arrival": {
+        "time": "21:49",
+        "timezone": "BST"
+      },
+      "aircraft": {
+        "model": "A320",
+        "registration": "G-EZRY"
+      },
+      "status": "unknown",
+      "scrapedAt": "2025-10-18T20:50:06.611Z"
+    },
+    "timestamp": 1760820606612
+  },
+  "EJU94KE": {
+    "data": {
+      "flightNumber": "EJU94KE",
+      "date": "18 Oct 2025",
+      "airline": {
+        "code": "EJU",
+        "name": "Unknown Airline"
+      },
+      "origin": {
+        "code": "GLA",
+        "airport": "Glasgow Airport",
+        "city": "Glasgow",
+        "country": "GB",
+        "flag": "🇬🇧",
+        "latitude": 55.871899,
+        "longitude": -4.43306
+      },
+      "destination": {
+        "code": "PMI",
+        "airport": "Palma de Mallorca Airport",
+        "city": "Palma de Mallorca",
+        "country": "ES",
+        "flag": "🇪🇸",
+        "latitude": 39.551701,
+        "longitude": 2.73881
+      },
+      "departure": {
+        "time": "21:20",
+        "timezone": "BST"
+      },
+      "arrival": {
+        "time": "23:07",
+        "timezone": "CEST"
+      },
+      "aircraft": {
+        "model": "A320",
+        "registration": "OE-IJL"
+      },
+      "status": "unknown",
+      "scrapedAt": "2025-10-18T21:07:45.799Z"
+    },
+    "timestamp": 1760821665801
+  },
+  "EJU34BW": {
+    "data": {
+      "flightNumber": "EJU34BW",
+      "date": "21 Oct 2025",
+      "airline": {
+        "code": "EJU",
+        "name": "Unknown Airline"
+      },
+      "origin": {
+        "code": "MAN",
+        "airport": "Manchester Airport",
+        "city": "Manchester, Greater Manchester",
+        "country": "GB",
+        "flag": "🇬🇧",
+        "latitude": 53.349375,
+        "longitude": -2.279521
+      },
+      "destination": {
+        "code": "AGP",
+        "airport": "Málaga-Costa del Sol Airport",
+        "city": "Málaga",
+        "country": "ES",
+        "flag": "🇪🇸",
+        "latitude": 36.6749,
+        "longitude": -4.49911
+      },
+      "departure": {
+        "time": "09:40",
+        "timezone": "BST"
+      },
+      "arrival": {
+        "time": "13:25",
+        "timezone": "CEST"
+      },
+      "aircraft": {
+        "model": "A320",
+        "registration": "OE-ICB"
+      },
+      "status": "unknown",
+      "scrapedAt": "2025-10-21T11:25:41.877Z"
+    },
+    "timestamp": 1761045941878
+  },
+  "RYR50NV": {
+    "data": {
+      "flightNumber": "RYR50NV",
+      "date": "21 Oct 2025",
+      "airline": {
+        "code": "RYR",
+        "name": "Ryanair"
+      },
+      "origin": {
+        "code": "NRN",
+        "airport": "Weeze Airport",
+        "city": "Weeze",
+        "country": "DE",
+        "flag": "🇩🇪",
+        "latitude": 51.6024017334,
+        "longitude": 6.14216995239
+      },
+      "destination": {
+        "code": "RBA",
+        "airport": "Rabat-Salé Airport",
+        "city": "Rabat",
+        "country": "MA",
+        "flag": "🇲🇦",
+        "latitude": 34.051498,
+        "longitude": -6.75152
+      },
+      "departure": {
+        "time": "11:00",
+        "timezone": "CEST"
+      },
+      "arrival": {
+        "time": "12:27",
+        "timezone": "+01"
+      },
+      "aircraft": {
+        "model": "B738",
+        "registration": "EI-EMF"
+      },
+      "status": "unknown",
+      "scrapedAt": "2025-10-21T11:28:02.105Z"
+    },
+    "timestamp": 1761046082106
+  },
+  "RYR226N": {
+    "data": {
+      "flightNumber": "RYR226N",
+      "date": "21 Oct 2025",
+      "airline": {
+        "code": "RYR",
+        "name": "Ryanair"
+      },
+      "origin": {
+        "code": "AGP",
+        "airport": "Málaga-Costa del Sol Airport",
+        "city": "Málaga",
+        "country": "ES",
+        "flag": "🇪🇸",
+        "latitude": 36.6749,
+        "longitude": -4.49911
+      },
+      "destination": {
+        "code": "CRL",
+        "airport": "Brussels South Charleroi Airport",
+        "city": "Charleroi",
+        "country": "BE",
+        "flag": "🇧🇪",
+        "latitude": 50.460982,
+        "longitude": 4.457158
+      },
+      "departure": {
+        "time": "13:35",
+        "timezone": "CEST"
+      },
+      "arrival": {
+        "time": "13:48",
+        "timezone": "CEST"
+      },
+      "aircraft": {
+        "model": "B38M",
+        "registration": "EI-IGG"
+      },
+      "status": "unknown",
+      "scrapedAt": "2025-10-21T11:48:41.590Z"
+    },
+    "timestamp": 1761047321591
+  },
+  "RYR94LK": {
+    "data": {
+      "flightNumber": "RYR94LK",
+      "date": "22 Oct 2025",
+      "airline": {
+        "code": "RYR",
+        "name": "Ryanair"
+      },
+      "origin": {
+        "code": "DUB",
+        "airport": "Dublin Airport",
+        "city": "Dublin",
+        "country": "IE",
+        "flag": "🇮🇪",
+        "latitude": 53.428713,
+        "longitude": -6.262121
+      },
+      "destination": {
+        "code": "PFO",
+        "airport": "Paphos International Airport",
+        "city": "Paphos",
+        "country": "CY",
+        "flag": "🇨🇾",
+        "latitude": 34.717999,
+        "longitude": 32.485699
+      },
+      "departure": {
+        "time": "19:40",
+        "timezone": "IST"
+      },
+      "arrival": {
+        "time": "22:32",
+        "timezone": "EEST"
+      },
+      "aircraft": {
+        "model": "B38M",
+        "registration": "EI-IHW"
+      },
+      "status": "unknown",
+      "scrapedAt": "2025-10-22T19:32:53.373Z"
+    },
+    "timestamp": 1761161573379
+  },
+  "VLG3943": {
+    "data": {
+      "flightNumber": "VLG3943",
+      "date": "22 Oct 2025",
+      "airline": {
+        "code": "VLG",
+        "name": "Unknown Airline"
+      },
+      "origin": {
+        "code": "SVQ",
+        "airport": "Sevilla Airport",
+        "city": "Sevilla",
+        "country": "ES",
+        "flag": "🇪🇸",
+        "latitude": 37.417999,
+        "longitude": -5.89311
+      },
+      "destination": {
+        "code": "PMI",
+        "airport": "Palma de Mallorca Airport",
+        "city": "Palma de Mallorca",
+        "country": "ES",
+        "flag": "🇪🇸",
+        "latitude": 39.551701,
+        "longitude": 2.73881
+      },
+      "departure": {
+        "time": "22:05",
+        "timezone": "CEST"
+      },
+      "arrival": {
+        "time": "22:17",
+        "timezone": "CEST"
+      },
+      "aircraft": {
+        "model": "A320",
+        "registration": "EC-JTR"
+      },
+      "status": "unknown",
+      "scrapedAt": "2025-10-22T20:17:43.474Z"
+    },
+    "timestamp": 1761164263475
   }
 }

@@ -1073,5 +1073,48 @@
       "scrapedAt": "2025-10-23T11:28:27.251Z"
     },
     "timestamp": 1761218907257
+  },
+  "AFR334X": {
+    "data": {
+      "flightNumber": "AFR334X",
+      "date": "23 Oct 2025",
+      "airline": {
+        "code": "AFR",
+        "name": "Air France"
+      },
+      "origin": {
+        "code": "CDG",
+        "airport": "Charles de Gaulle International Airport",
+        "city": "Paris (Roissy-en-France, Val-d'Oise)",
+        "country": "FR",
+        "flag": "🇫🇷",
+        "latitude": 49.012798,
+        "longitude": 2.55
+      },
+      "destination": {
+        "code": "BOS",
+        "airport": "Logan International Airport",
+        "city": "Boston",
+        "country": "US",
+        "flag": "🇺🇸",
+        "latitude": 42.36197,
+        "longitude": -71.0079
+      },
+      "departure": {
+        "time": "14:20",
+        "timezone": "CEST"
+      },
+      "arrival": {
+        "time": "08:44",
+        "timezone": "EDT"
+      },
+      "aircraft": {
+        "model": "A359",
+        "registration": "F-HTYG"
+      },
+      "status": "unknown",
+      "scrapedAt": "2025-10-23T12:44:14.532Z"
+    },
+    "timestamp": 1761223454534
   }
 }

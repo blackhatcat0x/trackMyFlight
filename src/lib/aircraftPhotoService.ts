@@ -1,4 +1,5 @@
 // lib/aircraftPhotoService.ts
+import { launchBrowser } from '@/lib/launchBrowser';
 
 export interface AircraftPhoto {
   imageUrl: string;
@@ -18,7 +19,7 @@ export interface AircraftPhoto {
 // Dynamic import for puppeteer
 let puppeteer: any = null;
 try {
-  puppeteer = require('puppeteer');
+  puppeteer = require('puppeteer-core');
 } catch (e) {
   console.warn('⚠️ Puppeteer not installed');
 }
@@ -35,24 +36,8 @@ class AircraftPhotoService {
   }
 
   private async getBrowser() {
-    if (!puppeteer) {
-      throw new Error('Puppeteer not installed');
-    }
-
     if (!this.browser) {
-      console.log('🚀 Launching Puppeteer browser for aircraft photos...');
-      this.browser = await puppeteer.launch({
-        headless: 'new',
-        args: [
-          '--no-sandbox',
-          '--disable-setuid-sandbox',
-          '--disable-dev-shm-usage',
-          '--disable-gpu',
-          '--disable-blink-features=AutomationControlled',
-        ],
-        ignoreHTTPSErrors: true,
-      });
-      console.log('✅ Browser launched');
+      this.browser = await launchBrowser();
     }
     return this.browser;
   }

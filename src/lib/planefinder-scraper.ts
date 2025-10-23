@@ -7,11 +7,12 @@ import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'fs';
 import { parse } from 'node-html-parser';
 import { join } from 'path';
 import { AirportData, lookupAirport } from './airportLookup';
+import { launchBrowser } from '@/lib/launchBrowser';
 
 // Dynamic import for puppeteer
 let puppeteer: any = null;
 try {
-  puppeteer = require('puppeteer');
+  puppeteer = require('puppeteer-core');
 } catch (e) {
   console.warn('⚠️ Puppeteer not installed. Install with: npm install puppeteer');
 }
@@ -142,25 +143,10 @@ class PlaneFinderScraper {
     return statusMap[statusClass] || 'unknown';
   }
 
-  private async getBrowser() {
-    if (!puppeteer) {
-      throw new Error('Puppeteer not installed. Run: npm install puppeteer');
-    }
 
+  private async getBrowser() {
     if (!this.browser) {
-      console.log('🚀 Launching Puppeteer browser...');
-      this.browser = await puppeteer.launch({
-        headless: 'new',
-        args: [
-          '--no-sandbox',
-          '--disable-setuid-sandbox',
-          '--disable-dev-shm-usage',
-          '--disable-gpu',
-          '--disable-blink-features=AutomationControlled',
-        ],
-        ignoreHTTPSErrors: true,
-      });
-      console.log('✅ Browser launched');
+      this.browser = await launchBrowser();
     }
     return this.browser;
   }

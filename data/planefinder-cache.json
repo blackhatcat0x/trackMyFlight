@@ -1116,5 +1116,48 @@
       "scrapedAt": "2025-10-23T12:44:14.532Z"
     },
     "timestamp": 1761223454534
+  },
+  "AFR344": {
+    "data": {
+      "flightNumber": "AFR344",
+      "date": "23 Oct 2025",
+      "airline": {
+        "code": "AFR",
+        "name": "Air France"
+      },
+      "origin": {
+        "code": "CDG",
+        "airport": "Charles de Gaulle International Airport",
+        "city": "Paris (Roissy-en-France, Val-d'Oise)",
+        "country": "FR",
+        "flag": "🇫🇷",
+        "latitude": 49.012798,
+        "longitude": 2.55
+      },
+      "destination": {
+        "code": "YUL",
+        "airport": "Montreal / Pierre Elliott Trudeau International Airport",
+        "city": "Montréal",
+        "country": "CA",
+        "flag": "🇨🇦",
+        "latitude": 45.467837,
+        "longitude": -73.742294
+      },
+      "departure": {
+        "time": "14:10",
+        "timezone": "CEST"
+      },
+      "arrival": {
+        "time": "09:21",
+        "timezone": "EDT"
+      },
+      "aircraft": {
+        "model": "A359",
+        "registration": "F-HTYH"
+      },
+      "status": "unknown",
+      "scrapedAt": "2025-10-23T13:21:45.304Z"
+    },
+    "timestamp": 1761225705305
   }
 }

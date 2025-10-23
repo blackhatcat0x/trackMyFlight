@@ -1,4 +1,6 @@
 /** @type {import('next').NextConfig} */
+const path = require('path');
+
 const nextConfig = {
   typescript: {
     ignoreBuildErrors: true,
@@ -8,15 +10,18 @@ const nextConfig = {
   },
   // Enable React strict mode for better development experience
   reactStrictMode: true,
-  
+
+  // Output standalone for better Heroku compatibility
+  output: 'standalone',
+
   // Configure webpack
-  webpack: (config, { isServer }) => {
+  webpack: (config, { isServer, webpack }) => {
     // Configure path aliases
     config.resolve.alias = {
       ...config.resolve.alias,
-      '@': './src',
+      '@': path.resolve(__dirname, './src'),
     };
-   
+
     // Cesium configuration - only for client-side
     if (!isServer) {
       config.resolve.fallback = {
@@ -25,46 +30,21 @@ const nextConfig = {
         net: false,
         tls: false,
       };
-     
+
       // Handle Cesium's WebAssembly files
       config.module.rules.push({
         test: /\.wasm$/,
         type: 'asset/resource',
       });
 
-      // Copy Cesium static assets
-      const CopyWebpackPlugin = require('copy-webpack-plugin');
-      config.plugins.push(
-        new CopyWebpackPlugin({
-          patterns: [
-            {
-              from: 'node_modules/cesium/Build/Cesium/Workers',
-              to: '../public/cesium/Workers',
-            },
-            {
-              from: 'node_modules/cesium/Build/Cesium/ThirdParty',
-              to: '../public/cesium/ThirdParty',
-            },
-            {
-              from: 'node_modules/cesium/Build/Cesium/Assets',
-              to: '../public/cesium/Assets',
-            },
-            {
-              from: 'node_modules/cesium/Build/Cesium/Widgets',
-              to: '../public/cesium/Widgets',
-            },
-          ],
-        })
-      );
-
       // Set Cesium base URL
       config.plugins.push(
-        new (require('webpack')).DefinePlugin({
+        new webpack.DefinePlugin({
           CESIUM_BASE_URL: JSON.stringify('/cesium'),
         })
       );
     }
-   
+
     return config;
   },
 };

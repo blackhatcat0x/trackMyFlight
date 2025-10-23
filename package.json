@@ -7,6 +7,7 @@
     "dev": "next dev",
     "build": "next build",
     "start": "next start",
+    "start:prod": "NODE_ENV=production ts-node --project tsconfig.json server.ts",
     "lint": "next lint",
     "type-check": "tsc --noEmit",
     "dev:next": "next dev"
@@ -29,6 +30,7 @@
     "socket.io-client": "^4.7.0",
     "tailwind-merge": "^2.0.0",
     "tailwindcss-animate": "^1.0.7",
+    "ts-node": "^10.9.0",
     "zustand": "^4.4.0"
   },
   "devDependencies": {

@@ -84,7 +84,7 @@ export default function SearchPage() {
 
   const handleSearch = async (e: React.FormEvent) => {
     e.preventDefault()
-    
+
     if (!searchQuery.trim()) return
 
     setIsSearching(true)
@@ -106,6 +106,9 @@ export default function SearchPage() {
         if (flights.length === 0) {
           const msg = result?.note || `No flights found for "${searchQuery.trim()}"`
           setSearchError(msg)
+        } else {
+          // After getting search results, enrich airline data from aircraft photos
+          enrichAirlineDataFromPhotos(flights)
         }
       } else {
         throw new Error(result.error || result.message || 'Search failed')
@@ -116,6 +119,64 @@ export default function SearchPage() {
       setSearchResults([])
     } finally {
       setIsSearching(false)
+    }
+  }
+
+  const enrichAirlineDataFromPhotos = async (flights: Flight[]) => {
+    // Process each flight that has a registration and unknown airline
+    for (const flight of flights) {
+      const hasUnknownAirline = flight.airline.name === 'Unknown Airline'
+      const hasRegistration = flight.aircraft?.registration
+
+      if (hasRegistration && hasUnknownAirline) {
+        try {
+          console.log(`🔍 Fetching aircraft photo for ${flight.aircraft!.registration} to get airline info...`)
+
+          // Fetch aircraft photo which includes airline information
+          const photoResponse = await fetch(`/api/aircraft-photo?registration=${encodeURIComponent(flight.aircraft!.registration!)}`)
+
+          if (photoResponse.ok) {
+            const photoData = await photoResponse.json()
+            const photo = photoData.photo
+
+            // If photo contains airline info and it's not "Unknown"
+            if (photo?.airline && photo.airline !== 'Unknown' && photo.airline !== 'Unknown Airline') {
+              console.log(`✅ Found airline from photo: ${photo.airline} for flight ${flight.flightNumber}`)
+
+              // Update the cache with the airline information
+              try {
+                const updateResponse = await fetch('/api/update-cache', {
+                  method: 'POST',
+                  headers: {
+                    'Content-Type': 'application/json',
+                  },
+                  body: JSON.stringify({
+                    flightNumber: flight.flightNumber,
+                    airlineName: photo.airline
+                  })
+                })
+
+                if (updateResponse.ok) {
+                  console.log(`✅ Cache updated for ${flight.flightNumber}`)
+
+                  // Update the local state to reflect the new airline name
+                  setSearchResults(prevFlights =>
+                    prevFlights.map(f =>
+                      f.id === flight.id
+                        ? { ...f, airline: { ...f.airline, name: photo.airline } }
+                        : f
+                    )
+                  )
+                }
+              } catch (updateError) {
+                console.warn(`⚠️ Failed to update cache for ${flight.flightNumber}:`, updateError)
+              }
+            }
+          }
+        } catch (photoError) {
+          console.warn(`⚠️ Failed to fetch photo for ${flight.aircraft!.registration}:`, photoError)
+        }
+      }
     }
   }
 

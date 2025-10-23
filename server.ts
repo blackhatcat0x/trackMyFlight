@@ -1,8 +1,8 @@
 // server.ts - Next.js Standalone + Socket.IO
-import { setupSocket } from '@/lib/socket';
 import { createServer } from 'http';
 import next from 'next';
 import { Server } from 'socket.io';
+import { setupSocket } from './src/lib/socket';
 
 const dev = process.env.NODE_ENV !== 'production';
 const currentPort = parseInt(process.env.PORT || '3000', 10);

@@ -1030,5 +1030,48 @@
       "scrapedAt": "2025-10-23T10:12:52.156Z"
     },
     "timestamp": 1761214372157
+  },
+  "RYR7VK": {
+    "data": {
+      "flightNumber": "RYR7VK",
+      "date": "23 Oct 2025",
+      "airline": {
+        "code": "RYR",
+        "name": "Ryanair"
+      },
+      "origin": {
+        "code": "VRN",
+        "airport": "Verona Villafranca Valerio Catullo Airport",
+        "city": "Caselle (VR)",
+        "country": "IT",
+        "flag": "🇮🇹",
+        "latitude": 45.394955,
+        "longitude": 10.887303
+      },
+      "destination": {
+        "code": "BHX",
+        "airport": "Birmingham Airport",
+        "city": "Birmingham, West Midlands",
+        "country": "GB",
+        "flag": "🇬🇧",
+        "latitude": 52.453899,
+        "longitude": -1.74803
+      },
+      "departure": {
+        "time": "12:15",
+        "timezone": "CEST"
+      },
+      "arrival": {
+        "time": "12:28",
+        "timezone": "BST"
+      },
+      "aircraft": {
+        "model": "B38M",
+        "registration": "EI-ILM"
+      },
+      "status": "unknown",
+      "scrapedAt": "2025-10-23T11:28:27.251Z"
+    },
+    "timestamp": 1761218907257
   }
 }

@@ -5,6 +5,7 @@
   "private": true,
   "scripts": {
     "dev": "next dev",
+    "prebuild": "node scripts/copy-cesium-files.js",
     "build": "next build",
     "start": "next start",
     "start:prod": "NODE_ENV=production ts-node --project tsconfig.json server.ts",
@@ -43,7 +44,6 @@
     "@typescript-eslint/parser": "^7.0.0",
     "autoprefixer": "^10.0.0",
     "babel-plugin-module-resolver": "^5.0.2",
-    "copy-webpack-plugin": "^13.0.1",
     "eslint": "^8.57.0",
     "eslint-config-next": "^14.2.0",
     "postcss": "^8.0.0",

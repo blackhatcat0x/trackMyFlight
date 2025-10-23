@@ -8,7 +8,7 @@
     "prebuild": "node scripts/copy-cesium-files.js",
     "build": "next build",
     "start": "next start",
-    "start:prod": "NODE_ENV=production ts-node -r tsconfig-paths/register --project tsconfig.json server.ts",
+    "start:prod": "NODE_ENV=production ts-node --project tsconfig.json server.ts",
     "lint": "next lint",
     "type-check": "tsc --noEmit",
     "dev:next": "next dev",

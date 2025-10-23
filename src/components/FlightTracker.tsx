@@ -8,6 +8,7 @@ interface FlightTrackerProps {
   currentPosition: FlightPosition | null;
   interpolatedPosition: FlightPosition | null;
   isTracking: boolean;
+  isSimulated?: boolean; // Added
   onTrackingChange: (tracking: boolean) => void;
   showRoute?: boolean;
   className?: string;
@@ -20,6 +21,7 @@ export const FlightTracker: React.FC<FlightTrackerProps> = ({
   currentPosition,
   interpolatedPosition,
   isTracking,
+  isSimulated = false, // Added
   onTrackingChange,
   showRoute = true,
   className = '',
@@ -164,10 +166,10 @@ export const FlightTracker: React.FC<FlightTrackerProps> = ({
           'line-cap': 'round'
         },
         paint: {
-          'line-color': '#3B82F6',
+          'line-color': isSimulated ? '#f59e0b' : '#3B82F6', // Orange if simulated
           'line-width': 3,
           'line-opacity': 0.6,
-          'line-dasharray': [2, 2]
+          'line-dasharray': isSimulated ? [2, 2] : [2, 2] // Keep dashed
         }
       });
     }
@@ -202,6 +204,16 @@ export const FlightTracker: React.FC<FlightTrackerProps> = ({
       });
     }
   };
+
+  // Update route color when simulation state changes
+  useEffect(() => {
+    const map = mapRef.current;
+    if (!map || !mapLoaded) return;
+
+    if (map.getLayer('route')) {
+      map.setPaintProperty('route', 'line-color', isSimulated ? '#f59e0b' : '#3B82F6');
+    }
+  }, [isSimulated, mapLoaded]);
 
   // Update map center when interpolatedPosition changes
   useEffect(() => {
@@ -316,7 +328,9 @@ export const FlightTracker: React.FC<FlightTrackerProps> = ({
             width: '100%',
             height: '100%',
             objectFit: 'contain',
-            filter: 'drop-shadow(0 4px 6px rgba(0,0,0,0.4))',
+            filter: isSimulated 
+              ? 'drop-shadow(0 4px 6px rgba(245, 158, 11, 0.6))' 
+              : 'drop-shadow(0 4px 6px rgba(0,0,0,0.4))',
           }}
         />
       </div>
@@ -332,6 +346,18 @@ export const FlightTracker: React.FC<FlightTrackerProps> = ({
 
       {mapLoaded && (
         <>
+          {/* Simulation Warning Banner */}
+          {isSimulated && (
+            <div className="absolute top-4 left-1/2 transform -translate-x-1/2 z-20">
+              <div className="bg-amber-500/95 backdrop-blur-sm rounded-lg px-4 py-2 text-white border border-amber-400 shadow-lg">
+                <div className="flex items-center gap-2 text-sm font-medium">
+                  <span className="animate-pulse">⚠️</span>
+                  <span>SIMULATED APPROACH - Live tracking unavailable</span>
+                </div>
+              </div>
+            </div>
+          )}
+
           {/* Control buttons */}
           <div className="absolute top-4 left-4 flex flex-col gap-2 z-10">
             <button
@@ -387,9 +413,12 @@ export const FlightTracker: React.FC<FlightTrackerProps> = ({
           {displayPosition && (
             <div className="absolute bottom-4 left-4 bg-white/95 backdrop-blur-sm rounded-lg p-3 shadow-lg border border-gray-200 max-w-xs z-10">
               <div className="flex items-center gap-2 mb-2">
-                <div className={`w-2 h-2 rounded-full ${isTracking ? 'bg-green-500 animate-pulse' : 'bg-gray-400'}`}></div>
+                <div className={`w-2 h-2 rounded-full ${
+                  isSimulated ? 'bg-amber-500 animate-pulse' : 
+                  isTracking ? 'bg-green-500 animate-pulse' : 'bg-gray-400'
+                }`}></div>
                 <div className="text-sm font-semibold text-gray-900">
-                  {isTracking ? 'Live Tracking' : 'Paused'}
+                  {isSimulated ? 'Simulated Approach' : isTracking ? 'Live Tracking' : 'Paused'}
                 </div>
               </div>
               <div className="grid grid-cols-2 gap-x-4 gap-y-1 text-xs">

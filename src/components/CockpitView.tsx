@@ -7,6 +7,7 @@ import React, { useEffect, useRef, useState } from 'react';
 interface CockpitViewProps {
   flight: Flight;
   interpolatedPosition: FlightPosition | null;
+  isSimulated?: boolean;
   className?: string;
 }
 

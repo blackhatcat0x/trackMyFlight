@@ -944,5 +944,48 @@
       "scrapedAt": "2025-10-22T20:17:43.474Z"
     },
     "timestamp": 1761164263475
+  },
+  "MSR985": {
+    "data": {
+      "flightNumber": "MSR985",
+      "date": "23 Oct 2025",
+      "airline": {
+        "code": "MSR",
+        "name": "Unknown Airline"
+      },
+      "origin": {
+        "code": "CAI",
+        "airport": "Cairo International Airport",
+        "city": "Cairo",
+        "country": "EG",
+        "flag": "🇪🇬",
+        "latitude": 30.111534,
+        "longitude": 31.396694
+      },
+      "destination": {
+        "code": "JFK",
+        "airport": "John F Kennedy International Airport",
+        "city": "New York",
+        "country": "US",
+        "flag": "🇺🇸",
+        "latitude": 40.639447,
+        "longitude": -73.779317
+      },
+      "departure": {
+        "time": "07:50",
+        "timezone": "EEST"
+      },
+      "arrival": {
+        "time": "11:00",
+        "timezone": "EDT"
+      },
+      "aircraft": {
+        "model": "B77W",
+        "registration": "SU-GDO"
+      },
+      "status": "unknown",
+      "scrapedAt": "2025-10-23T09:05:51.738Z"
+    },
+    "timestamp": 1761210351749
   }
 }

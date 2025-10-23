@@ -269,17 +269,22 @@ export default function FlightDetailPage({ params }: { params: { id: string } })
   const hasMountedRef = useRef(false);
 
   // Use shared flight position hook
-  const { 
-    currentPosition, 
-    interpolatedPosition, 
-    lastUpdateTime,
-    isTracking,
-    setIsTracking 
-  } = useFlightPosition({
-    flightNumber: flight?.flightNumber || '',
-    initialPosition: flight?.currentPosition || null,
-    isTracking: true,
-  });
+const { 
+  currentPosition, 
+  interpolatedPosition, 
+  lastUpdateTime,
+  isTracking,
+  isSimulated,  // Add this
+  setIsTracking 
+} = useFlightPosition({
+  flightNumber: flight?.flightNumber || '',
+  initialPosition: flight?.currentPosition || null,
+  destinationAirport: flight?.destination ? {  // Add this
+    latitude: flight.destination.latitude,
+    longitude: flight.destination.longitude
+  } : null,
+  isTracking: true,
+});
 
   useEffect(() => {
     setUserTimezone(getUserTimezone());
@@ -674,6 +679,7 @@ export default function FlightDetailPage({ params }: { params: { id: string } })
                     currentPosition={currentPosition}
                     interpolatedPosition={interpolatedPosition}
                     isTracking={isTracking}
+                    isSimulated={isSimulated}
                     onTrackingChange={setIsTracking}
                     showRoute={true}
                     className="w-full h-full"
@@ -689,6 +695,7 @@ export default function FlightDetailPage({ params }: { params: { id: string } })
                   <CockpitView
                     flight={flight}
                     interpolatedPosition={interpolatedPosition}
+                    isSimulated={isSimulated} 
                     className="w-full h-full"
                   />
                 </div>

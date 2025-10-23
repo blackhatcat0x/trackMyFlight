@@ -262,8 +262,6 @@ export default function FlightDetailPage({ params }: { params: { id: string } })
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
   const [userTimezone, setUserTimezone] = useState<string>('Local')
-  const [aircraftPhoto, setAircraftPhoto] = useState<any>(null)
-  const [loadingPhoto, setLoadingPhoto] = useState(false)
   const router = useRouter()
   
   const hasMountedRef = useRef(false);
@@ -393,25 +391,6 @@ const {
     };
   }, [params.id]);
 
-  useEffect(() => {
-    if (flight?.aircraft?.registration) {
-      const fetchAircraftPhoto = async () => {
-        setLoadingPhoto(true);
-        try {
-          const response = await fetch(`/api/aircraft-photo?registration=${encodeURIComponent(flight.aircraft!.registration!)}`);
-          if (response.ok) {
-            const data = await response.json();
-            setAircraftPhoto(data.photo);
-          }
-        } catch (error) {
-          console.warn('Failed to load aircraft photo:', error);
-        } finally {
-          setLoadingPhoto(false);
-        }
-      };
-      fetchAircraftPhoto();
-    }
-  }, [flight?.aircraft?.registration]);
 
   const handleBack = () => router.push('/search')
 
@@ -709,13 +688,13 @@ const {
           {flight.aircraft && (
             <div className="bg-white/10 backdrop-blur-md rounded-2xl shadow-2xl p-6 border border-white/20 mb-6">
               <h3 className="text-xl font-bold text-white mb-4">Aircraft Information</h3>
-              
-              {aircraftPhoto && (
+
+              {(flight.aircraft as any).photo && (
                 <div className="mb-6 rounded-lg overflow-hidden border border-white/20">
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-0">
                     <div className="relative">
-                      <img 
-                        src={aircraftPhoto.thumbnailUrl || aircraftPhoto.imageUrl} 
+                      <img
+                        src={(flight.aircraft as any).photo.thumbnailUrl || (flight.aircraft as any).photo.imageUrl}
                         alt={`${flight.aircraft.registration} - ${flight.aircraft.model}`}
                         className="w-full h-full object-cover"
                         style={{ maxHeight: '300px' }}
@@ -724,41 +703,41 @@ const {
                         }}
                       />
                     </div>
-                    
+
                     <div className="bg-white/5 p-4 flex flex-col justify-between">
                       <div className="space-y-3">
                         <div>
                           <div className="text-xs text-blue-300 mb-1">📸 Photographer</div>
-                          <div className="text-sm font-medium text-white">{aircraftPhoto.photographer}</div>
+                          <div className="text-sm font-medium text-white">{(flight.aircraft as any).photo.photographer}</div>
                         </div>
-                        
-                        {aircraftPhoto.photoDate !== 'Unknown' && (
+
+                        {(flight.aircraft as any).photo.photoDate !== 'Unknown' && (
                           <div>
                             <div className="text-xs text-blue-300 mb-1">📅 Photo Date</div>
-                            <div className="text-sm font-medium text-white">{aircraftPhoto.photoDate}</div>
+                            <div className="text-sm font-medium text-white">{(flight.aircraft as any).photo.photoDate}</div>
                           </div>
                         )}
-                        
-                        {aircraftPhoto.location !== 'Unknown' && (
+
+                        {(flight.aircraft as any).photo.location !== 'Unknown' && (
                           <div>
                             <div className="text-xs text-blue-300 mb-1">📍 Location</div>
-                            <div className="text-sm font-medium text-white">{aircraftPhoto.location}</div>
+                            <div className="text-sm font-medium text-white">{(flight.aircraft as any).photo.location}</div>
                           </div>
                         )}
-                        
-                        {aircraftPhoto.views > 0 && (
+
+                        {(flight.aircraft as any).photo.views > 0 && (
                           <div className="flex items-center gap-4 text-sm text-blue-200">
-                            <span>👁️ {aircraftPhoto.views.toLocaleString()} views</span>
-                            {aircraftPhoto.likes > 0 && (
-                              <span>❤️ {aircraftPhoto.likes} likes</span>
+                            <span>👁️ {(flight.aircraft as any).photo.views.toLocaleString()} views</span>
+                            {(flight.aircraft as any).photo.likes > 0 && (
+                              <span>❤️ {(flight.aircraft as any).photo.likes} likes</span>
                             )}
                           </div>
                         )}
                       </div>
-                      
+
                       <div className="mt-4 pt-3 border-t border-white/20">
-                        <a 
-                          href={aircraftPhoto.imageUrl}
+                        <a
+                          href={(flight.aircraft as any).photo.imageUrl}
                           target="_blank"
                           rel="noopener noreferrer"
                           className="inline-flex items-center gap-2 text-blue-300 hover:text-blue-100 transition-colors text-sm font-medium"
@@ -773,23 +752,14 @@ const {
                   </div>
                 </div>
               )}
-              
-              {loadingPhoto && !aircraftPhoto && (
-                <div className="mb-6 rounded-lg border border-white/20 bg-white/5 h-64 flex items-center justify-center">
-                  <div className="text-center">
-                    <div className="inline-block animate-spin rounded-full h-8 w-8 border-b-2 border-blue-400 mb-2"></div>
-                    <p className="text-blue-200 text-sm">Loading aircraft photo...</p>
-                  </div>
-                </div>
-              )}
 
               <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                 {flight.aircraft.registration && (
                   <div className="bg-white/5 rounded-lg p-3 border border-white/10">
                     <div className="text-xs text-blue-300">Registration</div>
                     <div className="text-sm font-medium text-white">{flight.aircraft.registration}</div>
-                    {aircraftPhoto?.serialNumber && aircraftPhoto.serialNumber !== 'Unknown' && (
-                      <div className="text-xs text-blue-200 mt-1">S/N: {aircraftPhoto.serialNumber}</div>
+                    {(flight.aircraft as any).photo?.serialNumber && (flight.aircraft as any).photo.serialNumber !== 'Unknown' && (
+                      <div className="text-xs text-blue-200 mt-1">S/N: {(flight.aircraft as any).photo.serialNumber}</div>
                     )}
                   </div>
                 )}
@@ -797,15 +767,15 @@ const {
                   <div className="bg-white/5 rounded-lg p-3 border border-white/10">
                     <div className="text-xs text-blue-300">Model</div>
                     <div className="text-sm font-medium text-white">{flight.aircraft.model}</div>
-                    {aircraftPhoto?.aircraftType && aircraftPhoto.aircraftType !== 'Unknown' && aircraftPhoto.aircraftType !== flight.aircraft.model && (
-                      <div className="text-xs text-blue-200 mt-1">{aircraftPhoto.aircraftType}</div>
+                    {(flight.aircraft as any).photo?.aircraftType && (flight.aircraft as any).photo.aircraftType !== 'Unknown' && (flight.aircraft as any).photo.aircraftType !== flight.aircraft.model && (
+                      <div className="text-xs text-blue-200 mt-1">{(flight.aircraft as any).photo.aircraftType}</div>
                     )}
                   </div>
                 )}
-                {aircraftPhoto?.airline && aircraftPhoto.airline !== 'Unknown' && (
+                {(flight.aircraft as any).photo?.airline && (flight.aircraft as any).photo.airline !== 'Unknown' && (
                   <div className="bg-white/5 rounded-lg p-3 border border-white/10">
                     <div className="text-xs text-blue-300">Operator</div>
-                    <div className="text-sm font-medium text-white">{aircraftPhoto.airline}</div>
+                    <div className="text-sm font-medium text-white">{(flight.aircraft as any).photo.airline}</div>
                   </div>
                 )}
               </div>

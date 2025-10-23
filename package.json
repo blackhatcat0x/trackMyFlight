@@ -10,7 +10,8 @@
     "start:prod": "NODE_ENV=production ts-node --project tsconfig.json server.ts",
     "lint": "next lint",
     "type-check": "tsc --noEmit",
-    "dev:next": "next dev"
+    "dev:next": "next dev",
+    "heroku-postbuild": "npm run build"
   },
   "dependencies": {
     "@tanstack/react-query": "^5.0.0",
@@ -51,6 +52,9 @@
   },
   "engines": {
     "node": ">=18.0.0"
+  },
+  "puppeteer": {
+    "skipDownload": true
   },
   "keywords": [
     "flight",

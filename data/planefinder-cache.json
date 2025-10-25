@@ -1202,5 +1202,48 @@
       "scrapedAt": "2025-10-25T14:11:20.357Z"
     },
     "timestamp": 1761401480359
+  },
+  "QTR74F": {
+    "data": {
+      "flightNumber": "QTR74F",
+      "date": "25 Oct 2025",
+      "airline": {
+        "code": "QTR",
+        "name": "Qatar Airways"
+      },
+      "origin": {
+        "code": "LHR",
+        "airport": "London Heathrow Airport",
+        "city": "London",
+        "country": "GB",
+        "flag": "🇬🇧",
+        "latitude": 51.4706,
+        "longitude": -0.461941
+      },
+      "destination": {
+        "code": "DOH",
+        "airport": "Hamad International Airport",
+        "city": "Doha",
+        "country": "QA",
+        "flag": "🇶🇦",
+        "latitude": 25.273056,
+        "longitude": 51.608056
+      },
+      "departure": {
+        "time": "19:05",
+        "timezone": "BST"
+      },
+      "arrival": {
+        "time": "21:39",
+        "timezone": "+03"
+      },
+      "aircraft": {
+        "model": "A359",
+        "registration": "A7-AMK"
+      },
+      "status": "unknown",
+      "scrapedAt": "2025-10-25T18:39:44.176Z"
+    },
+    "timestamp": 1761417584177
   }
 }

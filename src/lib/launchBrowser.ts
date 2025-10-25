@@ -1,6 +1,9 @@
 // src/lib/launchBrowser.ts
 export async function launchBrowser() {
-  const herokuChrome = process.env.PUPPETEER_EXECUTABLE_PATH;
+  // On Heroku, Chrome is installed to /tmp at runtime
+  const herokuChrome = process.env.CHROME_BIN || 
+                       process.env.PUPPETEER_EXECUTABLE_PATH ||
+                       (process.env.DYNO ? '/tmp/.cache/puppeteer/chrome/linux-141.0.7390.122/chrome-linux64/chrome' : null);
   const isLocal = !herokuChrome;
 
   console.log('🔍 Launching browser...');
@@ -18,8 +21,8 @@ export async function launchBrowser() {
     '--disable-gpu',
     '--disable-features=NetworkService',
     '--disable-blink-features=AutomationControlled',
-    '--single-process',
-    '--no-zygote',
+    '--disable-software-rasterizer',
+    '--disable-extensions',
   ];
 
   const launchOptions: any = {

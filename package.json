@@ -12,8 +12,7 @@
     "lint": "next lint",
     "type-check": "tsc --noEmit",
     "dev:next": "next dev",
-    "heroku-postbuild": "next build && mkdir -p .next/standalone/.next && cp -r .next/static .next/standalone/.next/ && if [ -d public ]; then cp -r public .next/standalone/public; fi"
-  },
+    "heroku-postbuild": "npx puppeteer browsers install chrome && next build && mkdir -p .next/standalone/.next && cp -r .next/static .next/standalone/.next/ && if [ -d public ]; then cp -r public .next/standalone/public; fi"  },
   "dependencies": {
     "@tanstack/react-query": "^5.0.0",
     "axios": "^1.6.0",

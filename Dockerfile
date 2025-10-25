@@ -7,8 +7,20 @@ RUN npm run build
 
 FROM node:18-alpine AS runner
 WORKDIR /app
-RUN apk add --no-cache chromium
+
+# Install Chromium and required dependencies
+RUN apk add --no-cache \
+    chromium \
+    nss \
+    freetype \
+    harfbuzz \
+    ca-certificates \
+    ttf-freefont \
+    nodejs \
+    yarn
+
 ENV PUPPETEER_EXECUTABLE_PATH=/usr/bin/chromium-browser
+ENV PUPPETEER_SKIP_CHROMIUM_DOWNLOAD=true
 ENV NODE_ENV=production
 
 # Copy standalone build

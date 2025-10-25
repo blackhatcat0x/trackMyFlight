@@ -1245,5 +1245,48 @@
       "scrapedAt": "2025-10-25T18:39:44.176Z"
     },
     "timestamp": 1761417584177
+  },
+  "NSZ5708": {
+    "data": {
+      "flightNumber": "NSZ5708",
+      "date": "25 Oct 2025",
+      "airline": {
+        "code": "NSZ",
+        "name": "Norwegian"
+      },
+      "origin": {
+        "code": "LPA",
+        "airport": "Gran Canaria Airport",
+        "city": "Gran Canaria Island",
+        "country": "ES",
+        "flag": "🇪🇸",
+        "latitude": 27.9319,
+        "longitude": -15.3866
+      },
+      "destination": {
+        "code": "OSL",
+        "airport": "Oslo Airport, Gardermoen",
+        "city": "Oslo (Gardermoen)",
+        "country": "NO",
+        "flag": "🇳🇴",
+        "latitude": 60.193901,
+        "longitude": 11.1004
+      },
+      "departure": {
+        "time": "17:20",
+        "timezone": "WEST"
+      },
+      "arrival": {
+        "time": "21:46",
+        "timezone": "CEST"
+      },
+      "aircraft": {
+        "model": "B738",
+        "registration": "LN-NHE"
+      },
+      "status": "unknown",
+      "scrapedAt": "2025-10-25T19:46:15.677Z"
+    },
+    "timestamp": 1761421575700
   }
 }

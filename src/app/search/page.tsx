@@ -83,27 +83,19 @@ export default function SearchPage() {
   const [searchStage, setSearchStage] = useState(0)
   const router = useRouter()
 
-  // Cycle through search stages
+  // Cycle through search progress stages
   useEffect(() => {
     if (!isSearching) {
       setSearchStage(0)
       return
     }
 
-    const stages = [
-      'Looking for aircraft...',
-      'Gathering flight data...',
-      'Analyzing results...',
-      'Finalizing...'
-    ]
-
     const interval = setInterval(() => {
-      setSearchStage(prev => (prev + 1) % stages.length)
-    }, 1500) // Change stage every 1.5 seconds
+      setSearchStage(prev => (prev + 1) % 4)
+    }, 3000)
 
     return () => clearInterval(interval)
   }, [isSearching])
-
   const handleSearch = async (e: React.FormEvent) => {
     e.preventDefault()
 
@@ -112,7 +104,6 @@ export default function SearchPage() {
     setIsSearching(true)
     setSearchError(null)
     setHasSearched(true)
-    setSearchStage(0)
 
     try {
       const params = new URLSearchParams()
@@ -142,7 +133,6 @@ export default function SearchPage() {
       setSearchResults([])
     } finally {
       setIsSearching(false)
-      setSearchStage(0)
     }
   }
 
@@ -308,30 +298,18 @@ export default function SearchPage() {
     }
   }
 
-  const searchStages = [
-    { icon: '🔍', text: 'Looking for aircraft...', color: 'text-blue-300' },
-    { icon: '📡', text: 'Gathering flight data...', color: 'text-cyan-300' },
-    { icon: '⚙️', text: 'Analyzing results...', color: 'text-purple-300' },
-    { icon: '✨', text: 'Finalizing...', color: 'text-green-300' }
-  ]
-
   return (
     <div className="min-h-screen bg-gradient-to-br from-slate-900 via-blue-900 to-slate-900">
-      {/* Animated background */}
       <div className="fixed inset-0 overflow-hidden">
         <div className="absolute -top-40 -right-40 w-80 h-80 bg-blue-500 rounded-full mix-blend-multiply filter blur-xl opacity-20 animate-pulse"></div>
         <div className="absolute -bottom-40 -left-40 w-80 h-80 bg-purple-500 rounded-full mix-blend-multiply filter blur-xl opacity-20 animate-pulse"></div>
       </div>
 
       <div className="relative z-10 min-h-screen flex flex-col">
-        {/* Header */}
         <div className="bg-white/10 backdrop-blur-md border-b border-white/20">
           <div className="max-w-4xl mx-auto px-4 py-4">
             <div className="flex items-center gap-4">
-              <button
-                onClick={handleBack}
-                className="text-white hover:text-blue-300 transition-colors p-2"
-              >
+              <button onClick={handleBack} className="text-white hover:text-blue-300 transition-colors p-2">
                 <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
                 </svg>
@@ -350,12 +328,37 @@ export default function SearchPage() {
           </div>
         </div>
 
-        {/* Main content */}
-        <div className="flex-1 flex items-start justify-center pt-12 pb-8 px-4">
-          <div className="w-full max-w-3xl">
-            <div className="bg-white/10 backdrop-blur-lg rounded-2xl p-8 border border-white/20 shadow-2xl">
+        <div className="flex-1 flex items-center justify-center p-4">
+          <div className="w-full max-w-2xl">
+            <div className="bg-white/10 backdrop-blur-md rounded-2xl shadow-2xl p-8 border border-white/20">
+              <div className="text-center mb-8">
+                <div className="mb-4 relative flex justify-center">
+                  <div className="absolute inset-0 bg-cyan-400 rounded-full blur-2xl opacity-20 animate-pulse mx-auto w-72 h-44"></div>
+                  <div className="relative z-10">
+                    <Image
+                      src="/img/page-logo.png"
+                      alt="TrackMyFlight Logo"
+                      width={200}
+                      height={121}
+                      className="object-contain h-full"
+                    />
+                  </div>
+                </div>
+                <h2 className="text-3xl font-bold text-white mb-2">Search Flights</h2>
+                <p className="text-blue-200">Find live flights in real-time</p>
+              </div>
+
+              <div className="mb-6 bg-white/10 rounded-lg p-1 backdrop-blur-sm">
+                <button
+                  className="w-full py-3 px-4 rounded-md transition-all transform hover:scale-105 bg-gradient-to-r from-blue-500 to-cyan-500 text-white shadow-lg"
+                >
+                  <span className="block text-sm font-medium">Flight Number</span>
+                  <span className="block text-xs opacity-75">EZY8456 or U28456</span>
+                </button>
+              </div>
+
               <form onSubmit={handleSearch} className="space-y-4">
-                <div className="relative">
+                <div className="relative group">
                   <div className="absolute inset-y-0 left-0 pl-4 flex items-center pointer-events-none">
                     <svg
                       className="h-6 w-6 text-blue-300 group-hover:text-blue-200 transition-colors"
@@ -403,22 +406,32 @@ export default function SearchPage() {
               {hasSearched && (
                 <div className="mt-8">
                   {isSearching ? (
-                    <div className="text-center py-8">
-                      <div className="inline-block animate-spin rounded-full h-12 w-12 border-b-2 border-blue-400 mb-4"></div>
-                      <div className="space-y-2">
-                        {searchStages.map((stage, index) => (
-                          <div
-                            key={index}
-                            className={`transition-all duration-300 ${
-                              index === searchStage 
-                                ? `${stage.color} font-semibold scale-110` 
-                                : 'text-blue-200/50 scale-100'
-                            }`}
-                          >
-                            <span className="text-xl mr-2">{stage.icon}</span>
-                            {stage.text}
+                    <div className="bg-white/10 backdrop-blur-sm rounded-xl p-8 border border-white/20">
+                      <div className="flex flex-col items-center gap-4">
+                        <div className="relative">
+                          <div className="w-16 h-16 border-4 border-blue-400/30 border-t-blue-400 rounded-full animate-spin"></div>
+                          <div className="absolute inset-0 flex items-center justify-center">
+                            <span className="text-2xl">✈️</span>
                           </div>
-                        ))}
+                        </div>
+                        <div className="text-center">
+                          <div className="text-white font-semibold text-lg mb-2">
+                            {searchStage === 0 && 'Looking for aircraft...'}
+                            {searchStage === 1 && 'Gathering flight data...'}
+                            {searchStage === 2 && 'Analyzing results...'}
+                            {searchStage === 3 && 'Finalizing...'}
+                          </div>
+                          <div className="flex gap-2 justify-center">
+                            {[0, 1, 2, 3].map((idx) => (
+                              <div
+                                key={idx}
+                                className={`w-2 h-2 rounded-full transition-all ${
+                                  idx === searchStage ? 'bg-blue-400 scale-125' : 'bg-blue-400/30'
+                                }`}
+                              />
+                            ))}
+                          </div>
+                        </div>
                       </div>
                     </div>
                   ) : searchError ? (
@@ -542,64 +555,75 @@ export default function SearchPage() {
                   ) : null}
                 </div>
               )}
-            </div>
 
-            {!hasSearched && (
               <div className="mt-8">
-                <h2 className="text-xl font-bold text-white mb-4">Recent Searches</h2>
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-                  {getRecentSearches().map((search, idx) => (
-                    <button
-                      key={idx}
-                      onClick={() => {
-                        setSearchQuery(search.term)
-                      }}
-                      className="bg-white/10 backdrop-blur-sm rounded-xl p-4 border border-white/20 hover:bg-white/20 transition-all text-left group"
-                    >
-                      <div className="flex items-center justify-between">
-                        <div className="min-w-0 flex-1">
-                          <div className="font-bold text-white group-hover:text-blue-300 transition-colors truncate">
-                            {search.term}
+                <h3 className="text-lg font-semibold text-white mb-4 flex items-center gap-2">
+                  <span className="text-2xl">🕐</span>
+                  Recent Searches
+                </h3>
+                {getRecentSearches().length > 0 ? (
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                    {getRecentSearches().map((item: any) => (
+                      <button
+                        key={item.term}
+                        onClick={() => {
+                          setSearchQuery(item.term)
+                        }}
+                        className="bg-white/10 hover:bg-white/20 backdrop-blur-sm text-blue-200 hover:text-white py-3 px-4 rounded-xl text-sm transition-all transform hover:scale-105 border border-white/20 hover:border-white/30 text-left"
+                      >
+                        <div className="flex items-center justify-between gap-2">
+                          <div className="flex items-center gap-2 min-w-0">
+                            <div className="font-medium text-white truncate">{item.term}</div>
                           </div>
-                          <div className="text-blue-200 text-sm truncate">{search.desc}</div>
-                          <div className="flex items-center gap-2 mt-2">
-                            <div className="flex items-center gap-1">
-                              {search.originCountry && (
-                                <img 
-                                  src={`https://flagcdn.com/16x12/${search.originCountry.toLowerCase()}.png`}
-                                  alt={search.originCountry}
-                                  className="inline-block w-4 h-3"
-                                />
-                              )}
-                              <span className="text-blue-300 text-xs">{search.originCode}</span>
-                            </div>
+                          <div className="flex items-center gap-1 shrink-0">
+                            {item.originCountry && (
+                              <img 
+                                src={`https://flagcdn.com/20x15/${item.originCountry.toLowerCase()}.png`}
+                                alt={item.originCountry}
+                                className="inline-block w-5 h-3.75"
+                              />
+                            )}
                             <span className="text-blue-400 text-xs">→</span>
-                            <div className="flex items-center gap-1">
-                              {search.destinationCountry && (
-                                <img 
-                                  src={`https://flagcdn.com/16x12/${search.destinationCountry.toLowerCase()}.png`}
-                                  alt={search.destinationCountry}
-                                  className="inline-block w-4 h-3"
-                                />
-                              )}
-                              <span className="text-blue-300 text-xs">{search.destinationCode}</span>
-                            </div>
+                            {item.destinationCountry && (
+                              <img 
+                                src={`https://flagcdn.com/20x15/${item.destinationCountry.toLowerCase()}.png`}
+                                alt={item.destinationCountry}
+                                className="inline-block w-5 h-3.75"
+                              />
+                            )}
                           </div>
                         </div>
-                        <svg 
-                          className="w-5 h-5 text-blue-300 group-hover:text-white transition-colors shrink-0 ml-2" 
-                          fill="none" 
-                          stroke="currentColor" 
-                          viewBox="0 0 24 24"
-                        >
-                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
-                        </svg>
-                      </div>
-                    </button>
-                  ))}
+                        <div className="text-xs opacity-75 mt-1 truncate">{item.desc}</div>
+                      </button>
+                    ))}
+                  </div>
+                ) : (
+                  <div className="text-center py-8">
+                    <p className="text-blue-200">No recent searches available</p>
+                  </div>
+                )}
+              </div>
+
+              <div className="mt-8 pt-6 border-t border-white/20">
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-4 text-center">
+                  <div className="bg-white/5 rounded-lg p-3 border border-white/10">
+                    <div className="text-2xl mb-1">⚡</div>
+                    <div className="text-sm font-medium text-white">Real-time</div>
+                    <div className="text-xs text-blue-200">Live updates</div>
+                  </div>
+                  <div className="bg-white/5 rounded-lg p-3 border border-white/10">
+                    <div className="text-2xl mb-1">🌍</div>
+                    <div className="text-sm font-medium text-white">Global</div>
+                    <div className="text-xs text-blue-200">Worldwide coverage</div>
+                  </div>
+                  <div className="bg-white/5 rounded-lg p-3 border border-white/10">
+                    <div className="text-2xl mb-1">📱</div>
+                    <div className="text-sm font-medium text-white">Mobile</div>
+                    <div className="text-xs text-blue-200">Any device</div>
+                  </div>
                 </div>
               </div>
-            )}
+            </div>
           </div>
         </div>
       </div>

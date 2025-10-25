@@ -19,7 +19,7 @@ const nextConfig = {
     // Configure path aliases
     config.resolve.alias = {
       ...config.resolve.alias,
-      '@': path.resolve(__dirname, './src'),
+      '@': path.resolve(__dirname, './src'), 
     };
 
     // Cesium configuration - only for client-side

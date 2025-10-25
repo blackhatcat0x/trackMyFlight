@@ -21,11 +21,41 @@ export const CockpitView: React.FC<CockpitViewProps> = ({
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [viewMode, setViewMode] = useState<'cockpit' | 'chase'>('cockpit');
+    const [mapboxToken, setMapboxToken] = useState<string | null>(null);
   const lastUpdateRef = useRef<number>(0);
+
+
+    // Fetch Mapbox token - try local env first, then API for Heroku
+  useEffect(() => {
+    const localToken = process.env.NEXT_PUBLIC_MAPBOX_ACCESS_TOKEN;
+    
+    if (localToken) {
+      console.log('✅ Using local Mapbox token');
+      setMapboxToken(localToken);
+      return;
+    }
+
+    console.log('⚠️ No local token, fetching from API...');
+    fetch('/api/mapbox-token')
+      .then(res => res.json())
+      .then(data => {
+        if (data.token) {
+          console.log('✅ Using API Mapbox token');
+          setMapboxToken(data.token);
+        } else {
+          throw new Error('Mapbox token not configured on server');
+        }
+      })
+      .catch(err => {
+        console.error('Failed to fetch Mapbox token:', err);
+        setError('Failed to load Mapbox token. Check server configuration.');
+        setIsLoading(false);
+      });
+  }, []);
 
   // Initialize Mapbox
   useEffect(() => {
-    if (!mapContainerRef.current) return;
+    if (!mapContainerRef.current || !mapboxToken) return;
 
     const initializeMapbox = async () => {
       try {
@@ -33,13 +63,8 @@ export const CockpitView: React.FC<CockpitViewProps> = ({
         
         const container = mapContainerRef.current;
         if (!container) return;
-        
-        const token = process.env.NEXT_PUBLIC_MAPBOX_ACCESS_TOKEN;
-        if (!token) {
-          throw new Error('Mapbox token not found. Add NEXT_PUBLIC_MAPBOX_ACCESS_TOKEN to .env.local');
-        }
 
-        mapboxgl.default.accessToken = token;
+        mapboxgl.default.accessToken = mapboxToken;
 
         const initialPosition = interpolatedPosition || flight.currentPosition;
         if (!initialPosition) {

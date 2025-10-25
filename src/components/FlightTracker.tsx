@@ -29,13 +29,41 @@ export const FlightTracker: React.FC<FlightTrackerProps> = ({
   const [showRouteState, setShowRouteState] = useState(showRoute);
   const [mapLoaded, setMapLoaded] = useState(false);
   const [mapError, setMapError] = useState<string | null>(null);
-  
+  const [mapboxToken, setMapboxToken] = useState<string | null>(null);
   const mapContainerRef = useRef<HTMLDivElement>(null);
   const mapRef = useRef<any>(null);
   const planeOverlayRef = useRef<HTMLDivElement>(null);
 
   // Use interpolated position for display
   const displayPosition = interpolatedPosition || currentPosition;
+
+
+    // Fetch Mapbox token - try local env first, then API for Heroku
+  useEffect(() => {
+    const localToken = process.env.NEXT_PUBLIC_MAPBOX_ACCESS_TOKEN;
+    
+    if (localToken) {
+      console.log('✅ Using local Mapbox token');
+      setMapboxToken(localToken);
+      return;
+    }
+
+    console.log('⚠️ No local token, fetching from API...');
+    fetch('/api/mapbox-token')
+      .then(res => res.json())
+      .then(data => {
+        if (data.token) {
+          console.log('✅ Using API Mapbox token');
+          setMapboxToken(data.token);
+        } else {
+          throw new Error('Mapbox token not configured on server');
+        }
+      })
+      .catch(err => {
+        console.error('Failed to fetch Mapbox token:', err);
+        setMapError('Failed to load Mapbox token. Check server configuration.');
+      });
+  }, []);
 
   // Log initial state
   useEffect(() => {
@@ -51,7 +79,7 @@ export const FlightTracker: React.FC<FlightTrackerProps> = ({
 
   // Initialize Mapbox map
   useEffect(() => {
-    if (!MAPBOX_TOKEN || !mapContainerRef.current || mapRef.current) return;
+    if (!mapboxToken || !mapContainerRef.current || mapRef.current) return;
 
     const initializeMap = async () => {
       try {

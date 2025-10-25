@@ -1288,5 +1288,48 @@
       "scrapedAt": "2025-10-25T19:46:15.677Z"
     },
     "timestamp": 1761421575700
+  },
+  "TRA71L": {
+    "data": {
+      "flightNumber": "TRA71L",
+      "date": "25 Oct 2025",
+      "airline": {
+        "code": "TRA",
+        "name": "Transavia"
+      },
+      "origin": {
+        "code": "ACE",
+        "airport": "César Manrique-Lanzarote Airport",
+        "city": "San Bartolomé",
+        "country": "ES",
+        "flag": "🇪🇸",
+        "latitude": 28.945499,
+        "longitude": -13.6052
+      },
+      "destination": {
+        "code": "EIN",
+        "airport": "Eindhoven Airport",
+        "city": "Eindhoven",
+        "country": "NL",
+        "flag": "🇳🇱",
+        "latitude": 51.4500999451,
+        "longitude": 5.37452983856
+      },
+      "departure": {
+        "time": "18:00",
+        "timezone": "WEST"
+      },
+      "arrival": {
+        "time": "22:08",
+        "timezone": "CEST"
+      },
+      "aircraft": {
+        "model": "B738",
+        "registration": "PH-HSA"
+      },
+      "status": "unknown",
+      "scrapedAt": "2025-10-25T20:09:06.910Z"
+    },
+    "timestamp": 1761422946910
   }
 }

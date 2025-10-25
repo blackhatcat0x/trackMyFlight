@@ -1159,5 +1159,48 @@
       "scrapedAt": "2025-10-23T13:21:45.304Z"
     },
     "timestamp": 1761225705305
+  },
+  "WUK823": {
+    "data": {
+      "flightNumber": "WUK823",
+      "date": "25 Oct 2025",
+      "airline": {
+        "code": "WUK",
+        "name": "Wizz Air UK"
+      },
+      "origin": {
+        "code": "LGW",
+        "airport": "London Gatwick Airport",
+        "city": "London",
+        "country": "GB",
+        "flag": "🇬🇧",
+        "latitude": 51.148771,
+        "longitude": -0.192089
+      },
+      "destination": {
+        "code": "VAR",
+        "airport": "Varna Airport",
+        "city": "Varna",
+        "country": "BG",
+        "flag": "🇧🇬",
+        "latitude": 43.232101,
+        "longitude": 27.8251
+      },
+      "departure": {
+        "time": "14:50",
+        "timezone": "BST"
+      },
+      "arrival": {
+        "time": "17:11",
+        "timezone": "EEST"
+      },
+      "aircraft": {
+        "model": "A21N",
+        "registration": "G-WUKM"
+      },
+      "status": "unknown",
+      "scrapedAt": "2025-10-25T14:11:20.357Z"
+    },
+    "timestamp": 1761401480359
   }
 }

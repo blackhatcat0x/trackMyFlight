@@ -1,5 +1,3 @@
 .cache/puppeteer
-node_modules/.cache
-.next/cache
-*.map
 .git
+*.map

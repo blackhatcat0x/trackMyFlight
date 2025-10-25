@@ -1,6 +1,12 @@
 .git
 .cache/puppeteer
 *.map
+/mobile
 /react-native-backup
 /examples
 /ui-componenets-extract
+node_modules/cesium
+node_modules/@swc
+node_modules/webpack
+node_modules/typescript
+node_modules/eslin

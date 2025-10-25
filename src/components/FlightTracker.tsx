@@ -95,7 +95,7 @@ export const FlightTracker: React.FC<FlightTrackerProps> = ({
         const mapboxglModule = await import('mapbox-gl');
         const mapboxgl = mapboxglModule.default;
         
-        mapboxgl.accessToken = MAPBOX_TOKEN;
+        mapboxgl.accessToken = mapboxToken;
 
         const initialPos = displayPosition || flight.currentPosition;
         

@@ -1,6 +1,6 @@
 // app/api/mapbox-token/route.ts
 export async function GET() {
-  const token = process.env.MAPBOX_ACCESS_TOKEN || '';
+  const token = process.env.NEXT_PUBLIC_MAPBOX_ACCESS_TOKEN || '';
   
   if (!token) {
     return Response.json(

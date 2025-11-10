@@ -28,9 +28,11 @@ COPY --from=builder /app/.next/standalone ./
 COPY --from=builder /app/.next/static ./.next/static
 COPY --from=builder /app/public ./public
 
-# Copy custom server and Socket.IO files
+# Copy the entire src directory (needed for Next.js to find the app directory)
+COPY --from=builder /app/src ./src
+
+# Copy custom server file
 COPY --from=builder /app/server.ts ./server.ts
-COPY --from=builder /app/src/lib/socket.ts ./src/lib/socket.ts
 
 # Install TypeScript runtime dependencies
 RUN npm install tsx

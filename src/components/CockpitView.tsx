@@ -125,7 +125,7 @@ export const CockpitView: React.FC<CockpitViewProps> = ({
         mapRef.current = null;
       }
     };
-  }, []);
+  }, [mapboxToken]);
 
   // Update camera position
   useEffect(() => {

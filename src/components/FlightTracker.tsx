@@ -150,7 +150,7 @@ export const FlightTracker: React.FC<FlightTrackerProps> = ({
         mapRef.current = null;
       }
     };
-  }, [MAPBOX_TOKEN]);
+  }, [mapboxToken]);
 
   // Add route layer
   const addRouteLayer = (map: any, position: FlightPosition) => {
@@ -289,7 +289,7 @@ export const FlightTracker: React.FC<FlightTrackerProps> = ({
     }
   }, [showRouteState, mapLoaded]);
 
-  if (!MAPBOX_TOKEN || mapError) {
+  if (!mapboxToken && !MAPBOX_TOKEN || mapError) {
     return (
       <div className={`relative ${className} bg-gradient-to-br from-blue-50 to-blue-100 rounded-lg overflow-hidden`}>
         <div className="absolute inset-0 flex items-center justify-center">

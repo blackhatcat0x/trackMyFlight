@@ -104,7 +104,6 @@ ui-componenets-extract/
 
 # Exclude only specific large assets that aren't needed for build
 assets/images/
-public/img/
 
 # Exclude large Cesium files from build context (will be copied from node_modules)
 public/cesium/

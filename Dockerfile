@@ -31,11 +31,13 @@ COPY --from=builder /app/public ./public
 # Copy the entire src directory (needed for Next.js to find the app directory)
 COPY --from=builder /app/src ./src
 
-# Copy custom server file
+# Copy custom server file and TypeScript configuration
 COPY --from=builder /app/server.ts ./server.ts
+COPY --from=builder /app/tsconfig.json ./tsconfig.json
+COPY --from=builder /app/next.config.js ./next.config.js
 
 # Install TypeScript runtime dependencies
-RUN npm install tsx
+RUN npm install tsx tsconfig-paths
 
 EXPOSE $PORT
 CMD ["npx", "tsx", "server.ts"]

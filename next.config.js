@@ -14,6 +14,22 @@ const nextConfig = {
   // Output standalone for better Heroku compatibility
   output: 'standalone',
 
+  // Configure images for standalone deployment
+  images: {
+    // Disable image optimization for static assets in production
+    // This fixes the Heroku deployment issue with /_next/image URLs
+    unoptimized: true,
+    
+    // Configure domains for external images (if needed in future)
+    domains: [],
+    
+    // Configure remote patterns for external images
+    remotePatterns: [],
+    
+    // Minimum cache TTL (in seconds) for optimized images
+    minimumCacheTTL: 60,
+  },
+
   // Configure webpack
   webpack: (config, { isServer, webpack }) => {
     // Configure path aliases

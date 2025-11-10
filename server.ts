@@ -28,6 +28,8 @@ async function createCustomServer() {
       if (req.url?.startsWith('/api/socketio')) {
         return;
       }
+      
+      // Ensure proper handling for all Next.js routes including static assets
       handle(req, res);
     });
 

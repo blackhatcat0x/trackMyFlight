@@ -81,7 +81,7 @@ export const FlightTracker: React.FC<FlightTrackerProps> = ({
   useEffect(() => {
     if (!mapboxToken || !mapContainerRef.current || mapRef.current) return;
 
-    const initializeMap = async () => {
+    const initializeMap = async () => { 
       try {
         // Load Mapbox CSS from CDN
         if (!document.querySelector('link[href*="mapbox-gl.css"]')) {

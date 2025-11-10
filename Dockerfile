@@ -28,6 +28,9 @@ COPY --from=builder /app/.next/standalone ./
 COPY --from=builder /app/.next/static ./.next/static
 COPY --from=builder /app/public ./public
 
+# Ensure public/img directory exists and is accessible
+RUN mkdir -p ./public/img && chmod -R 755 ./public
+
 # Copy custom server and Socket.IO files
 COPY --from=builder /app/server.ts ./server.ts
 COPY --from=builder /app/src/lib/socket.ts ./src/lib/socket.ts
